@@ -49,7 +49,7 @@ the first point in the pair is the westmost > northmost end of the segment; and 
 corresponding list of directions, where each direction is one of "HORIZONTAL", "VERTICAL",
 "SLOPE_UP", "SLOPE_DOWN".
 """
-def find_all_segments(grid, segment_length = 3):
+def find_all_segments(grid, segment_length = 2):
     rows, _ = np.shape(grid)
     segments = []
     directions = []
@@ -98,32 +98,50 @@ def is_solved(grid):
     possible_moves = list(filter(lambda point: not grid[point[0], point[1]], possible_moves))
     return len(possible_moves) == 0
 
+"Helper function to mark all `points` coordinates as `True` in `grid`. Operates in place."
+def _paint_points(grid, *points):
+    for point in points:
+        grid[point] = True
+
 """
-Generate a random problem by creating `n_segments` segments, `n_two` two-pixel non-segment
+Mark point1 and point2 as `True` on `grid`, then use `where_to_extend` to extend the segment
+thereby implied until it hits the edge of the grid. Operates in place.
+"""
+def extend_line(grid, point1, point2, direction):
+    _paint_points(grid, point1, point2)
+    for j in range(max(*grid.shape)):
+        if is_in_grid(point1, grid): grid[point1] = True
+        if is_in_grid(point2, grid): grid[point2] = True
+        point1, point2 = where_to_extend((point1, point2), direction)
+
+"""
+Generate a random problem by creating `n_three` three-pixel formations, `n_two` two-pixel
 formations, and `n_one` one-pixel non-segment formations. Extend the segments and verify
 that the resulting problem `is_solved`, else try again until `timeout` is reached.
 """
-def generate_problem(rows, cols, n_segments, n_two, n_one, timeout = 10000):
-    for t in range(1000):
+def generate_problem(rows, cols, n_three, n_two, n_one, segment_length = 2, timeout = 10_000):
+    for t in range(timeout):
         problem = np.zeros((rows, cols), bool)
-        for i in range(n_one):
-            problem[random.randrange(rows), random.randrange(cols)] = True
+        answer = np.copy(problem)
         for i in range(n_two):
             point_a = (random.randrange(1, rows-1), random.randrange(1, cols-1))
-            point_b = tuple(x + random.randrange(-1, 2) for x in point_a)
-            problem[point_a] = True
-            problem[point_b] = True
-        answer = np.copy(problem)
-        for i in range(n_segments):
+            direction = random.choice(DIRECTIONS)
+            point_b = where_to_extend((point_a, point_a), direction)[0]
+            _paint_points(problem, point_a, point_b)
+            _paint_points(answer, point_a, point_b)
+            if segment_length <= 2: extend_line(answer, point_a, point_b, direction)
+            else: _paint_points(answer, point_a, point_b)
+        for i in range(n_three):
             direction = random.choice(DIRECTIONS)
             anchor = (random.randrange(1, rows-1), random.randrange(1, cols-1))
             point_a, point_b = where_to_extend((anchor, anchor), direction)
-            for point in [anchor, point_a, point_b]:
-                problem[point] = True
-                answer[point] = True
-            for j in range(max(rows, cols)):
-                if is_in_grid(point_a, answer): answer[point_a] = True
-                if is_in_grid(point_b, answer): answer[point_b] = True
-                point_a, point_b = where_to_extend((point_a, point_b), direction)
+            _paint_points(problem, point_a, anchor, point_b)
+            _paint_points(answer, point_a, anchor, point_b)
+            if segment_length <= 3: extend_line(answer, point_a, point_b, direction)
+            else: _paint_points(answer, point_a, point_b)
+        for i in range(n_one):
+            prow, pcol = (random.randrange(rows), random.randrange(cols))
+            problem[prow, pcol] = True
+            answer[prow, pcol] = True
         if is_solved(answer): return problem, answer
     raise TimeoutError(f"Could not generate a problem in {timeout} iterations")
