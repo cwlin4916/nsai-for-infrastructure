@@ -10,7 +10,14 @@ requires-python = ">= 3.10"
 dependencies = [
     "numpy",
     "pandas",
-    "ipykernel"
+    "matplotlib",
+    "ipykernel",
+    "nltk",
+    "torch",
+    "torchsummary",
+    "scipy",
+    "scikit-learn",
+    "gymnasium"
 ]
 
 [project.optional-dependencies]
