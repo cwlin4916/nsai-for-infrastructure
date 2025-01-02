@@ -40,7 +40,7 @@ def _vertical_shear(grid, direction):
     result = np.zeros((rows*2-1, cols), bool)
     for col_n, col in enumerate(grid.T):
         first_offset = col_n if direction else rows-1-col_n
-        result[:, col_n] = np.concat([np.zeros(first_offset, bool), col, np.zeros(rows-1-first_offset, bool)])
+        result[:, col_n] = np.concatenate([np.zeros(first_offset, bool), col, np.zeros(rows-1-first_offset, bool)])
     return result
 
 """
