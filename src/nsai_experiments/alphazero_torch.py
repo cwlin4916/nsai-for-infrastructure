@@ -8,6 +8,8 @@ One-player Alpha Zero
 import numpy as np
 import torch
 import random
+import math
+
 myseed = 1
 torch.manual_seed(myseed)
 np.random.seed(myseed)
@@ -46,7 +48,9 @@ class Model(nn.Module):
         self.state_dim, self.state_discrete  = check_space(Env.observation_space)
         if not self.action_discrete: 
             raise ValueError('Continuous action space not implemented')
-        dim = np.array(self.state_dim)[0]
+        dim = np.array(math.prod(self.state_dim))
+
+        self.flatten_layer = nn.Flatten()
         self.lin1 = nn.Linear(dim, n_hidden_units)
         self.lin2 = nn.Linear(n_hidden_units, n_hidden_units)
         self.linV = nn.Linear(n_hidden_units, 1)
@@ -67,6 +71,7 @@ class Model(nn.Module):
 
     def forward(self, x):
         x = torch.as_tensor(x, dtype=torch.float32)
+        x = self.flatten_layer(x)
         x = self.activation(self.lin1(x))
         for i in range(self.n_hidden_layers-1):
             x = self.activation(self.lin2(x))
@@ -184,7 +189,8 @@ class MCTS():
         if self.root.terminal:
             raise(ValueError("Can't do tree search from a terminal state"))
 
-        for i in range(n_mcts):     
+        for i in range(n_mcts):
+            # print(f"n_mcts {i}")
             state = self.root # reset to root for new trace
             mcts_env = copy.deepcopy(Env) # copy original Env to rollout from
 #            print ("(Re)Starting MCTS episode <s>", mcts_env.state)
@@ -205,8 +211,10 @@ class MCTS():
                     state = action.add_child_state(s1,r,t,self.model) # expand
         #This makes a new State, which uses the network to predict pi and V but then ends this iteration of the search
         # This is where we could do a "rollout" of some length using pi, and backing out the "reward + value(from the V-net)" from a deeper level
-#                    print ("expand new child state", state.index)
+                    # print ("expand new child state", state.index)
                     break # note this ends episode.
+            # if state.terminal:
+            #     print("state is terminal", state.index)
 
             # Back-up 
             R = state.V         
@@ -230,7 +238,7 @@ class MCTS():
         if not hasattr(self.root.child_actions[a],'child_state'):
             self.root = None
             self.root_index = s1
-        elif np.linalg.norm(self.root.child_actions[a].child_state.index - s1) > 0.01:
+        elif np.linalg.norm(self.root.child_actions[a].child_state.index.astype(np.float32, copy=False) - s1.astype(np.float32, copy=False)) > 0.01:
             # point here is that S1 is the result of actually taking the action in the env, whereas
             # self.root.child_actions[a].child_state.index is the state reached DURING MCTS when we tried that action
             # in the root state; they should be the same in a non-stochastic environment.  Since this (the contruction of a MCTS tree 
@@ -246,7 +254,7 @@ class MCTS():
     def dump_tree(self):
         def recursive_part(state, level):
             sp = ' '
-            print(sp*level*3 + "state", state.index, state.n)
+            print(sp*level*3 + "state", state.index, state.n, "T" if state.terminal else " ")
             for child in state.child_actions:
                 print (sp*level*3 + "child action", child.index, child.n, child.W, child.Q)
                 if hasattr(child,'child_state'):
@@ -265,12 +273,12 @@ def test_model(model, env, plot=False):
     ncorrect = 0
     for i in range(nsamples):
         state = env.observation_space.sample()
-        teststate = state.reshape(1,len(state))
+        teststate = state[None,]
         V = model.predict_V(teststate).detach().numpy()
         pi = model.predict_pi(teststate).detach().numpy()
-        correct_val = len(state) - sum(state)
+        correct_val = len(state.flatten()) - state.sum()
         best_pi = argmax(pi)
-        correct_pi = state[best_pi] == 0
+        correct_pi = state.flatten()[best_pi] == 0
         ncorrect +=  correct_pi
         if (plot):
             print (i, V[0], correct_val, V[0]-correct_val, "                ", correct_pi)
@@ -288,8 +296,8 @@ def test_model(model, env, plot=False):
         ax.set_xlabel('TestSample',color='darkred')
         plt.savefig(os.getcwd()+'/val_fn_test.png',bbox_inches="tight",dpi=300)
 
-    Vs = np.array(Vs).reshape((nsamples))
-    Vstar = np.array(Vstar).reshape(Vs.shape)
+    Vs = np.array(Vs).flatten()
+    Vstar = np.array(Vstar).flatten()
     prop_correct = ncorrect/nsamples
     val_err_vect = Vs - Vstar
     val_err = np.linalg.norm(val_err_vect)
@@ -324,19 +332,21 @@ def agent(game,n_ep,n_mcts,max_ep_len,lr,c,gamma,data_size,batch_size,temp,n_hid
 
         mcts = MCTS(root_index=s,root=None,model=model,na=model.action_dim,gamma=gamma) # the object responsible for MCTS searches                             
         for t in range(max_ep_len):
+            # print(t)
             # MCTS step
             mcts.search(n_mcts=n_mcts,c=c,Env=Env) # perform a forward search
             state,pi,V = mcts.return_results(temp) # extract the root output
-#                print ("Results returned", state, pi, V)
-#                mcts.dump_tree()  # This is very illuminating!
+            # print ("Results returned", state, pi, V)
+            # mcts.dump_tree()  # This is very illuminating!
             D.store((state,V,pi))
 
             # Make the true step
             a = np.random.choice(len(pi),p=pi)
             a_store.append(a)
             s1,r,terminal,_,_ = Env.step(a)
+            r = float(r)
             # test: does NN predict same action?
-            netpi = model.predict_pi(state.reshape(1,len(state)))
+            netpi = model.predict_pi(state[None,])
             netpi = netpi.detach().numpy()
             neta = argmax(netpi)
             mctsa = argmax(pi)

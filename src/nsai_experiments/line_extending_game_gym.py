@@ -29,7 +29,8 @@ class WindowlessLineExtendingGameEnv(gym.Env):
     def _get_info(self):
         return {}
     
-    def reset(self, seed = None):
+    def reset(self, seed = None, options = None):
+        assert options is None
         random.setstate(self.pyrandom_state)
         super().reset(seed=seed)
         if seed is not None: random.seed(seed)
