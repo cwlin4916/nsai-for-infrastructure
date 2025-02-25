@@ -1,10 +1,13 @@
 import logging
 from collections import namedtuple
+from collections.abc import Iterable
 
 from nltk.tokenize import wordpunct_tokenize
 from nltk.parse.recursivedescent import RecursiveDescentParser
 from nltk import CFG, PCFG, Nonterminal
+from nltk.tree import Tree
 import numpy as np
+import scipy.ndimage
 
 from .zg_gym import Tile, Location, calc_distance_to_tile, calc_distance_to_location
 
@@ -57,7 +60,7 @@ def format_ruleset(ruleset):
     return " ".join(ruleset).replace("; ", ";\n")
 
 ZONING_GAME_PARSER = RecursiveDescentParser(ZONING_GAME_GRAMMAR)
-def parse_formatted_ruleset(formatted_ruleset):
+def parse_to_ast(formatted_ruleset):
     root, = ZONING_GAME_PARSER.parse(wordpunct_tokenize(formatted_ruleset)+[""])
     return root
 
@@ -118,13 +121,19 @@ def _process_rule(rule_ast):
     constraint = _process_constraint(constraint)
     return RuleNT(subject, constraint)
 
-def _extract_rule_list(parsed_ruleset):
-    "A parser of sorts that turns a ruleset AST into an intermediate representation that is easier to work with"
-    if len(parsed_ruleset) == 3:  # Handles `Policy -> Rule ";" Policy`
-        rule, _, rest = parsed_ruleset
-        return [_process_rule(rule)] + _extract_rule_list(rest)
+def parse_to_nt(ruleset):
+    """
+    A parser of sorts that turns a ruleset into a NamedTuple-based intermediate
+    representation that is easier to work with. The input can be an `nltk.tree.Tree` from
+    `parse_to_ast` or a string, in which case `parse_to_ast` is called first.
+    """
+    if not isinstance(ruleset, Tree):
+        ruleset = parse_to_ast(ruleset)
+    if len(ruleset) == 3:  # Handles `Policy -> Rule ";" Policy`
+        rule, _, rest = ruleset
+        return [_process_rule(rule)] + parse_to_nt(rest)
     else:  # Handles `Policy -> ""`
-        assert list(parsed_ruleset) == [""]
+        assert list(ruleset) == [""]
         return []
 
 def _calc_shortest_distance(tile_grid, from_row, from_col, to_object):
@@ -137,8 +146,16 @@ def _calc_shortest_distance(tile_grid, from_row, from_col, to_object):
             raise ValueError(f"Cannot calculate shortest distance to {to_object}")
     return 0
 
+def _calc_cluster_count(tile_grid, from_row, from_col):
+    _, num_features = scipy.ndimage.label(tile_grid == tile_grid[from_row, from_col])
+    return num_features
+
+def _calc_cluster_size(tile_grid, from_row, from_col):
+    clustered, _ = scipy.ndimage.label(tile_grid == tile_grid[from_row, from_col])
+    return np.count_nonzero(clustered == clustered[from_row, from_col])
+
 def _interpret_one_constraint(constraint, tile_grid, my_row, my_col, depth = 0):
-    logger.info(f"  {'  '*depth}Interpreting {constraint} on {(my_row, my_col)}")
+    logger.debug(f"  {'  '*depth}Interpreting {constraint} on {(my_row, my_col)}")
     # Fix some stuff for ease of recursion:
     subinterpret = lambda subconstraint: _interpret_one_constraint(subconstraint, tile_grid, my_row, my_col, depth = depth+1)
     # TODO rewrite in object-oriented style
@@ -152,32 +169,54 @@ def _interpret_one_constraint(constraint, tile_grid, my_row, my_col, depth = 0):
             return not subinterpret(constraint.sub)
         case DistanceConstraintNT():
             shortest_distance = _calc_shortest_distance(tile_grid, my_row, my_col, constraint.object)
-            logger.info(f"  {'  '*depth}  - found shortest distance {shortest_distance} vs. criterion {constraint.distance}")
-            return _calc_shortest_distance(tile_grid, my_row, my_col, constraint.object) <= constraint.distance
+            logger.debug(f"  {'  '*depth}  - found shortest distance {shortest_distance} vs. criterion {constraint.distance}")
+            return shortest_distance <= constraint.distance
         case ClusterCountConstraintNT():
-            print("in ClusterCountConstraintNT")
+            cluster_size = _calc_cluster_count(tile_grid, my_row, my_col)
+            logger.debug(f"  {'  '*depth}  - found cluster count {cluster_size} vs. criterion {constraint.count}")
+            return cluster_size <= constraint.count
         case ClusterSizeConstraintNT():
-            print("in ClusterSizeConstraintNT")
+            cluster_size = _calc_cluster_size(tile_grid, my_row, my_col)
+            logger.debug(f"  {'  '*depth}  - found cluster size {cluster_size} vs. criterion {constraint.size}")
+            return cluster_size <= constraint.size
         case _:
             raise ValueError(f"Failed to evaluate constraint {constraint}")
-    return True  # TODO placeholder
 
 def _interpret_indiv(rule_list, tile_grid, my_row, my_col):
-    "Like `interpret_indiv` but operates on a rule list rather than a raw AST"
+    "`interpret_indiv` helper that can only operate on a `NamedTuple` representation"
     logger.info(f"Interpreting on {Tile(tile_grid[my_row, my_col])} at {(my_row, my_col)}")
     my_tile = Tile(tile_grid[my_row, my_col])
     my_rules = list(filter(lambda rule: rule.subject == my_tile, rule_list))
-    return all([_interpret_one_constraint(rule.constraint, tile_grid, my_row, my_col) for rule in my_rules])
+    my_results = [_interpret_one_constraint(rule.constraint, tile_grid, my_row, my_col) for rule in my_rules]
+    total_result = all(my_results)
+    if total_result: logger.info(f"  - tile complies!")
+    else: logger.info(f" - tile violates rules: {[rule for (rule, result) in zip(my_rules, my_results) if not result]}")
+    return total_result
 
-def interpret_indiv(parsed_ruleset, tile_grid, my_row, my_col):
+def _parse_if_necessary(ruleset):
+    if isinstance(ruleset, Iterable) and all([isinstance(r, RuleNT) for r in ruleset]):
+        return ruleset
+    return parse_to_nt(ruleset)
+
+def interpret_indiv(ruleset, tile_grid, my_row, my_col):
     """
-    Check the given tile of the tile grid against the parsed ruleset AST and return whether
-    it complies. If we view sentences from the zoning game language as programs that
-    describe which tile configurations are allowed, this is an interpreter of such programs.
+    Check the given tile of the tile grid against the ruleset and return whether it
+    complies. If we view sentences from the zoning game language as programs that describe
+    which tile configurations are allowed, this is an interpreter of such programs.
+    `ruleset` can be the output of `parse_to_nt` or a valid input to that function, in which
+    case it is called first.
     """
-    rule_list = _extract_rule_list(parsed_ruleset)
+    rule_list = _parse_if_necessary(ruleset)
     return _interpret_indiv(rule_list, tile_grid, my_row, my_col)
 
-def interpret_grid(parsed_ruleset, tile_grid):
-    "Like `interpret_indiv` but returns a Boolean array of per-tile results across an entire tile grid."
-    pass  # TODO placeholder
+def interpret_grid(ruleset, tile_grid):
+    """
+    Like `interpret_indiv` but returns a Boolean array of per-tile results across an entire
+    tile grid. `ruleset` can be the output of `parse_to_nt` or a valid input to that
+    function, in which case it is called first.
+    """
+    ruleset = _parse_if_necessary(ruleset)
+    result = np.zeros(tile_grid.shape, dtype=np.bool)
+    for row, col in np.ndindex(tile_grid.shape):
+        result[row][col] = _interpret_indiv(ruleset, tile_grid, row, col)
+    return result

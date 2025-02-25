@@ -1,6 +1,7 @@
 from enum import Enum
 import logging
 import io
+import numbers
 
 import numpy as np
 
@@ -56,40 +57,45 @@ def calc_distance_to_coords(from_row, from_col, to_row, to_col):
     if to_col is None: to_col = from_col
     return np.sqrt((to_col-from_col)**2 + (to_row-from_row)**2)
 
-def calc_distance_to_location(grid_size, from_row, from_col, location):
+def calc_distance_to_location(tile_grid, from_row, from_col, location):
+    [grid_size] = set(tile_grid.shape)
     grid_max = grid_size - 1  # maximum index
     grid_mid = grid_max / 2  # 'coordinate' of midpoint
     calc_distance_to = lambda to_row, to_col: calc_distance_to_coords(from_row, from_col, to_row, to_col)
     match location:
         case Location.BOARD_CENTER:
-            return calc_distance_to(grid_mid, grid_mid)
+            result = calc_distance_to(grid_mid, grid_mid)
         case Location.BOARD_EDGE:
-            return min(
+            result = min(
                 calc_distance_to(0, None),
                 calc_distance_to(grid_max, None),
                 calc_distance_to(None, 0),
                 calc_distance_to(None, grid_max),
             )
         case Location.BOARD_CORNER:
-            return min(
+            result = min(
                 calc_distance_to(0, 0),
                 calc_distance_to(grid_max, 0),
                 calc_distance_to(0, grid_max),
                 calc_distance_to(grid_max, grid_max),
             )
         case Location.BOARD_VERTICAL_MEDIAN:
-            return calc_distance_to(None, grid_mid)
+            result = calc_distance_to(None, grid_mid)
         case Location.BOARD_HORIZONTAL_MEDIAN:
-            return calc_distance_to(grid_mid, None)
+            result = calc_distance_to(grid_mid, None)
         case _:
             raise ValueError()
+    assert isinstance(result, numbers.Number), f"After calculating distance to {location}, result {result} is a {type(result)}"
+    return result
 
 def calc_distance_to_tile(tile_grid, from_row, from_col, to_object):
     # PERF not at all optimized
     instances = np.argwhere(tile_grid == to_object.value)
     instances = [(to_row, to_col) for (to_row, to_col) in instances if (to_row, to_col) != (from_row, from_col)]
     distances = list(map(lambda to_coords: calc_distance_to_coords(from_row, from_col, *to_coords), instances))
-    return min(distances)
+    result = min(distances)
+    assert isinstance(result, numbers.Number)
+    return result
 
 def eval_tile_indiv_score(padded_grid, my_row, my_col):
     "Given a padded tile grid and the row and column in unpadded coordinates the of a particular tile, evaluate how well the grid satisfies that tile's objectives."
