@@ -204,3 +204,63 @@ def test_indiv_score():
     myenv.tile_grid = base_grid.copy()
     myenv.tile_grid[1, 0] = Tile.INDUSTRIAL.value
     assert eval_tile_indiv_score(pad_grid(myenv.tile_grid), 1, 1) == -2
+
+def _test_head_to_head(initial_grid, initial_queue, correct_move, test_reversed = True):
+    """
+    Given `initial_grid`, a tile grid with two spots left to fill, and `initial_queue`, the
+    two last tiles in the queue, verifies that playing `correct_move` and then the only
+    possible other move results in a greater final score than playing the moves the other
+    way around. If `test_reversed = True`, complete the entire test again with the tile
+    queue and correct move reversed.
+    """
+
+    assert np.count_nonzero(initial_grid == Tile.EMPTY.value) == 2
+    assert len(initial_queue) == 2
+
+    def __initialize_env():
+        myenv.reset(seed=0)
+        myenv.n_moves = np.count_nonzero(myenv.grid_size*myenv.grid_size - 2 - myenv.tile_grid)
+        myenv.tile_grid = initial_grid.copy()
+        myenv.tile_queue = np.zeros_like(myenv.tile_queue)
+        myenv.tile_queue[:2] = initial_queue
+
+    myenv = ZoningGameEnv(grid_size=6)
+    __initialize_env()
+    myenv.step(correct_move, on_invalid = "error")
+    [other_move] = np.flatnonzero(myenv.tile_grid == Tile.EMPTY.value)
+    _, score1, terminated, truncated, _ = myenv.step(other_move, on_invalid = "error")
+    assert terminated
+    assert not truncated
+
+    __initialize_env()
+    myenv.step(other_move, on_invalid = "error")
+    myenv.step(correct_move, on_invalid = "error")
+    _, score2, terminated, truncated, _ = myenv.step(other_move)
+    assert terminated
+    assert not truncated
+
+    assert score1 > score2
+
+    if test_reversed:
+        _test_head_to_head(initial_grid, initial_queue[::-1], other_move, test_reversed = False)
+
+def test_final_scoring():
+    """
+    Performs a series of manually constructed head-to-head comparisons between two ways of
+    making the last two moves in a zoning game instance and verifies that the correct one
+    wins.
+    """
+
+    t0 = Tile.EMPTY.value
+    tr = Tile.RESIDENTIAL.value
+    ti = Tile.INDUSTRIAL.value
+
+    # The world is half RESIDENTIAL, half INDUSTRIAL; put the remaining RESIDENTIAL and INDUSTRIAL tiles with the others
+    _test_head_to_head(np.array([
+        [tr, tr, tr, ti, ti, ti],
+        [tr, tr, tr, ti, ti, ti],
+        [tr, tr, tr, ti, t0, ti],
+        [tr, tr, tr, ti, ti, ti],
+        [tr, t0, tr, ti, ti, ti],
+        [tr, tr, tr, ti, ti, ti],
+    ]), [tr, ti], 25)

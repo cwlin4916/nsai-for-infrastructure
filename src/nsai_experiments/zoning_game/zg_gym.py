@@ -209,18 +209,24 @@ class ZoningGameEnv(gym.Env):
         buf.seek(0)
         return buf
     
-    def step(self, action, warn_invalid = False):
+    def step(self, action, on_invalid=None):
+        """
+        Options for `on_invalid`: `None` does nothing, `"warn"` logs a warning, `"error"`
+        raises an error
+        """
         coords = (action // self.grid_size, action % self.grid_size)
         if Tile(self.tile_grid[*coords]) is not Tile.EMPTY:
-            if warn_invalid:
-                logger.warning(f"Action {action} (coords {coords}) is invalid, skipping")
+            if on_invalid is not None:
+                invalid_msg = f"Action {action} (coords {coords}) is invalid, skipping"
+                if on_invalid == "warn": logger.warning(invalid_msg)
+                elif on_invalid == "error": raise ValueError(invalid_msg)
         else:
             self.tile_grid[*coords] = self.tile_queue[0]
             self.tile_queue[:-1] = self.tile_queue[1:]
             self.tile_queue[-1] = 0
         self.n_moves += 1
 
-        terminated = (len(self.tile_queue) == 0)
+        terminated = (all(self.tile_queue == 0))
         truncated = self.n_moves >= self.max_moves
         reward = self._eval_tile_grid_score() if terminated or truncated else 0  # only reward at the end
         if terminated:
