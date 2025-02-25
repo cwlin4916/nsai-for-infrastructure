@@ -99,8 +99,9 @@ def calc_distance_to_tile(tile_grid, from_row, from_col, to_object):
 
 def eval_tile_indiv_score(padded_grid, my_row, my_col):
     "Given a padded tile grid and the row and column in unpadded coordinates the of a particular tile, evaluate how well the grid satisfies that tile's objectives."
-    # TODO could use some more testing
-    my_tile = Tile(padded_grid[my_row+1, my_col+1])
+    unpadded_grid = padded_grid[1:-1, 1:-1]
+    [grid_size] = set(unpadded_grid.shape)
+    my_tile = Tile(unpadded_grid[my_row, my_col])
     match my_tile:
         case Tile.EMPTY:
             # Rules for EMPTY: no objectives, score is always zero
@@ -113,20 +114,17 @@ def eval_tile_indiv_score(padded_grid, my_row, my_col):
             return neighbor_score(padded_grid, my_row, my_col, [(Tile.RESIDENTIAL, +1), (Tile.DOWNTOWN, +4)])
         case Tile.INDUSTRIAL:
             # Rules for INDUSTRIAL: +1 for being within grid_size/6 of either the x-center line or the y-center line of the board (suppose there are railroads there)
-            # TODO replace with calc_distance_to_location, this is too complicated
-            dx2 = (my_row*2 - (padded_grid.shape[0]-3))**2
-            dy2 = (my_col*2 - (padded_grid.shape[1]-3))**2
-            distance_criterion = min(dx2, dy2) * 3**2 * 4 <= (sum(padded_grid.shape) - 4)**2
-            return 1*distance_criterion
+            dist_from_horiz = calc_distance_to_location(unpadded_grid, my_row, my_col, Location.BOARD_HORIZONTAL_MEDIAN)
+            dist_from_vert = calc_distance_to_location(unpadded_grid, my_row, my_col, Location.BOARD_VERTICAL_MEDIAN)
+            return 1 * ((dist_from_horiz <= grid_size/6) or (dist_from_vert <= grid_size/6))
         case Tile.DOWNTOWN:
             # Rules for DOWNTOWN: +2 for being within (grid_size/6) Euclidean distance of the center of the grid, +4 for adjacent DOWNTOWN, -2 for adjacent INDUSTRIAL
-            dx2 = (my_row*2 - (padded_grid.shape[0]-3))**2
-            dy2 = (my_col*2 - (padded_grid.shape[1]-3))**2
-            distance_criterion = (dx2 + dy2) * 3**2 * 4 <= (sum(padded_grid.shape) - 4)**2
+            dist_from_center = calc_distance_to_location(unpadded_grid, my_row, my_col, Location.BOARD_CENTER)
+            distance_criterion = dist_from_center <= grid_size/6
             return 2*distance_criterion + neighbor_score(padded_grid, my_row, my_col, [(Tile.DOWNTOWN, +4), (Tile.INDUSTRIAL, -2)])
         case Tile.PARK:
-            # Rules for PARK: +1 for adjacent RESIDENTIAL, +3 for adjacent DOWNTOWN
-            return neighbor_score(padded_grid, my_row, my_col, [(Tile.DOWNTOWN, +4), (Tile.INDUSTRIAL, -2)])
+            # Rules for PARK: +3 for adjacent DOWNTOWN, -2 for adjacent INDUSTRIAL
+            return neighbor_score(padded_grid, my_row, my_col, [(Tile.DOWNTOWN, +3), (Tile.INDUSTRIAL, -2)])
         case other:
             raise ValueError(f"Invalid tile: {other}")
 
