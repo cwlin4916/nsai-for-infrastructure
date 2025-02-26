@@ -235,3 +235,22 @@ def interpret_grid(ruleset, tile_grid):
     for row, col in np.ndindex(tile_grid.shape):
         result[row][col] = _interpret_indiv(ruleset, tile_grid, row, col)
     return result
+
+def interpret_valid_moves(ruleset, tile_grid, next_tile):
+    """
+    Given a ruleset, tile grid, and next tile, return a Boolean array of where that tile may
+    be placed in compliance with the ruleset.
+    """
+    # TODO test
+    
+    ruleset = _parse_if_necessary(ruleset)
+    tile_grid = tile_grid.copy()
+    result = np.zeros(tile_grid.shape, dtype=np.bool)
+
+    for row, col in np.ndindex(tile_grid.shape):
+        prev_tile = tile_grid[row, col]
+        tile_grid[row, col] = next_tile
+        result[row, col] = _interpret_indiv(ruleset, tile_grid, row, col)
+        tile_grid[row, col] = prev_tile
+
+    return result

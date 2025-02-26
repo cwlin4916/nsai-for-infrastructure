@@ -22,11 +22,11 @@ def get_legal_moves(obs):
     tile_grid, _ = obs
     return np.flatnonzero(tile_grid == Tile.EMPTY.value)
 
-def create_policy_random(seed=None):
+def create_policy_random(rng = None, seed=None, legal_moves_decider=get_legal_moves):
     "Creates a random policy function given an RNG seed `seed`."
-    myrand = np.random.default_rng(seed=seed)
+    myrand = np.random.default_rng(seed=seed) if rng is None else rng
     def policy_random(obs):
-        return myrand.choice(get_legal_moves(obs))
+        return myrand.choice(legal_moves_decider(obs))
     return policy_random
 
 def _evaluate_move(evaluator, tile_grid, next_tile, move):
@@ -35,17 +35,17 @@ def _evaluate_move(evaluator, tile_grid, next_tile, move):
     tile_grid[row, col] = next_tile
     return evaluator(tile_grid, row, col)
 
-def _create_policy_greedy(evaluator, seed=None):
+def _create_policy_greedy(evaluator, rng = None, seed=None, legal_moves_decider=get_legal_moves):
     """
     Given an `evaluator` function that takes a `tile_grid` and a `row` and `col` and returns
     a value, creates a policy that plays the move that always maximizes that value, breaking
     ties randomly.
     """
-    myrand = np.random.default_rng(seed=seed)
+    myrand = np.random.default_rng(seed=seed) if rng is None else rng
     def policy_greedy(obs):
         tile_grid, tile_queue = obs
         next_tile = tile_queue[0]
-        move_options = get_legal_moves(obs)
+        move_options = legal_moves_decider(obs)
         move_scores = [_evaluate_move(evaluator, tile_grid, next_tile, move) for move in move_options]
         max_score = max(move_scores)
         move_weights = [(1+myrand.random() if score == max_score else 0) for score in move_scores]
@@ -56,12 +56,12 @@ def _indiv_greedy_evaluator(tile_grid, row, col):
     padded_grid = pad_grid(tile_grid)
     return eval_tile_indiv_score(padded_grid, row, col)
 
-def create_policy_indiv_greedy(seed=None):
+def create_policy_indiv_greedy(rng = None, seed=None, legal_moves_decider=get_legal_moves):
     """
     Creates a policy that puts the next tile wherever would maximize its individual score at
     the current point in time, breaking ties randomly.
     """
-    return _create_policy_greedy(evaluator=_indiv_greedy_evaluator, seed=seed)
+    return _create_policy_greedy(evaluator=_indiv_greedy_evaluator, rng=rng, seed=seed, legal_moves_decider=legal_moves_decider)
 
 def _total_greedy_evaluator(tile_grid, row, col):
     padded_grid = pad_grid(tile_grid)
@@ -70,9 +70,9 @@ def _total_greedy_evaluator(tile_grid, row, col):
         total_score += eval_tile_indiv_score(padded_grid, row, col)
     return total_score
 
-def create_policy_total_greedy(seed=None):
+def create_policy_total_greedy(rng = None, seed=None, legal_moves_decider=get_legal_moves):
     """
     Creates a policy that puts the next tile wherever would maximize the total grid score at
     the current point in time, breaking ties randomly.
     """
-    return _create_policy_greedy(evaluator=_total_greedy_evaluator, seed=seed)
+    return _create_policy_greedy(evaluator=_total_greedy_evaluator, rng=rng, seed=seed, legal_moves_decider=legal_moves_decider)
