@@ -2,7 +2,7 @@ import logging
 
 import numpy as np
 
-from .zg_gym import ZoningGameEnv, Tile, pad_grid, eval_tile_indiv_score
+from .zg_gym import ZoningGameEnv, Tile, eval_tile_indiv_score, blank_of_size, pad_grid_inplace
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)
@@ -52,27 +52,33 @@ def _create_policy_greedy(evaluator, rng = None, seed=None, legal_moves_decider=
         return move_options[np.argmax(move_weights)]
     return policy_greedy
 
-def _indiv_greedy_evaluator(tile_grid, row, col):
-    padded_grid = pad_grid(tile_grid)
-    return eval_tile_indiv_score(padded_grid, row, col)
+def _create_indiv_greedy_evaluator():
+    padded_grid = blank_of_size(0)
+    def _indiv_greedy_evaluator(tile_grid, row, col):
+        pad_grid_inplace(padded_grid, tile_grid)
+        return eval_tile_indiv_score(padded_grid, row, col)
+    return _indiv_greedy_evaluator
 
 def create_policy_indiv_greedy(rng = None, seed=None, legal_moves_decider=get_legal_moves):
     """
     Creates a policy that puts the next tile wherever would maximize its individual score at
     the current point in time, breaking ties randomly.
     """
-    return _create_policy_greedy(evaluator=_indiv_greedy_evaluator, rng=rng, seed=seed, legal_moves_decider=legal_moves_decider)
+    return _create_policy_greedy(evaluator=_create_indiv_greedy_evaluator(), rng=rng, seed=seed, legal_moves_decider=legal_moves_decider)
 
-def _total_greedy_evaluator(tile_grid, row, col):
-    padded_grid = pad_grid(tile_grid)
-    total_score = 0
-    for row, col in np.ndindex(tile_grid.shape):
-        total_score += eval_tile_indiv_score(padded_grid, row, col)
-    return total_score
+def _create_total_greedy_evaluator():
+    padded_grid = blank_of_size(0)
+    def _total_greedy_evaluator(tile_grid, row, col):
+        pad_grid_inplace(padded_grid, tile_grid)
+        total_score = 0
+        for row, col in np.ndindex(tile_grid.shape):
+            total_score += eval_tile_indiv_score(padded_grid, row, col)
+        return total_score
+    return _total_greedy_evaluator
 
 def create_policy_total_greedy(rng = None, seed=None, legal_moves_decider=get_legal_moves):
     """
     Creates a policy that puts the next tile wherever would maximize the total grid score at
     the current point in time, breaking ties randomly.
     """
-    return _create_policy_greedy(evaluator=_total_greedy_evaluator, rng=rng, seed=seed, legal_moves_decider=legal_moves_decider)
+    return _create_policy_greedy(evaluator=_create_total_greedy_evaluator(), rng=rng, seed=seed, legal_moves_decider=legal_moves_decider)

@@ -2,6 +2,7 @@ from enum import Enum
 import logging
 import io
 import numbers
+import math
 
 import numpy as np
 
@@ -34,12 +35,27 @@ DEFAULT_OCCURRENCES = {
     Tile.PARK: 4/36
 }
 
+def blank_of_size(grid_size, fill_tile = Tile.EMPTY):  # 0.333
+    return np.ones((grid_size, grid_size), dtype=np.int32) * fill_tile.value
+
+_ORTHOGONAL_MASK_ROW = np.array([0, 2, 1, 1])
+_ORTHOGONAL_MASK_COL = np.array([1, 1, 2, 0])
+
 def orthogonal_neighbors(padded_grid, my_row, my_col):
     "Given a zero-padded tile grid and the row and column in unpadded coordinates of a particular tile, return a list of orthogonal (non-diagonal) neighbors"
-    return padded_grid[[my_row, my_row+2, my_row+1, my_row+1], [my_col+1, my_col+1, my_col+2, my_col]]  # north, south, east, west
+    return padded_grid[_ORTHOGONAL_MASK_ROW + my_row, _ORTHOGONAL_MASK_COL + my_col]  # north, south, east, west
 
 def neighbor_score(padded_grid, my_row, my_col, neighbor_spec):
     "Calculate a score based on a weighted count of neighbors with weights specified in neighbor_spec"
+
+    # PERF note that I prototyped a NumPy-only version of this function (taking a properly reformatted neighbor_spec) for performance:
+    #   neighbors = orthogonal_neighbors(padded_grid, my_row, my_col)[:, np.newaxis]
+    #   keys = neighbor_spec[:, 0][np.newaxis, :]
+    #   weights = neighbor_spec[:, 1]
+    #   matching_count = (neighbors == keys).sum(axis=0)
+    #   return np.dot(matching_count, weights)
+    # ; tragically it was slightly slower
+    
     score = 0
     neighbors = orthogonal_neighbors(padded_grid, my_row, my_col)
     for key, weight in neighbor_spec:
@@ -55,7 +71,7 @@ def calc_distance_to_coords(from_row, from_col, to_row, to_col):
     if to_row is None and to_col is None: raise ValueError()
     if to_row is None: to_row = from_row
     if to_col is None: to_col = from_col
-    return np.sqrt((to_col-from_col)**2 + (to_row-from_row)**2)
+    return math.hypot(to_col-from_col, to_row-from_row)
 
 def calc_distance_to_location(tile_grid, from_row, from_col, location):
     [grid_size] = set(tile_grid.shape)
@@ -89,11 +105,15 @@ def calc_distance_to_location(tile_grid, from_row, from_col, location):
     return result
 
 def calc_distance_to_tile(tile_grid, from_row, from_col, to_object):
-    # PERF not at all optimized
+    assert to_object.value != -1
+    this_object = tile_grid[from_row, from_col]
+    tile_grid[from_row, from_col] = -1
     instances = np.argwhere(tile_grid == to_object.value)
-    instances = [(to_row, to_col) for (to_row, to_col) in instances if (to_row, to_col) != (from_row, from_col)]
-    distances = list(map(lambda to_coords: calc_distance_to_coords(from_row, from_col, *to_coords), instances))
-    result = min(distances)
+    tile_grid[from_row, from_col] = this_object
+
+    diffs = instances - (from_row, from_col)
+    distances = np.hypot(diffs[:, 0], diffs[:, 1])
+    result = np.min(distances) if len(distances) > 0 else max(tile_grid.shape)
     assert isinstance(result, numbers.Number)
     return result
 
@@ -131,6 +151,16 @@ def eval_tile_indiv_score(padded_grid, my_row, my_col):
 def pad_grid(unpadded_grid):
     "Pad the grid with a one-width border of Tile.EMPTY"
     return np.pad(unpadded_grid, 1, mode="constant", constant_values=Tile.EMPTY.value)
+
+def pad_grid_inplace(place, unpadded_grid):
+    "Same as `pad_grid` but write the padded grid to `place`, which may be a pre-initialized array"
+    # if place.dtype != unpadded_grid.dtype:
+    #     raise ValueError(f"`place.dtype` must be same as `unpadded_grid.dtype`, got {place.dtype} and {unpadded_grid.dtype}")
+    desired_shape = (unpadded_grid.shape[0]+2, unpadded_grid.shape[1]+2)
+    if place.shape != desired_shape:
+        place.resize(desired_shape, refcheck=False)  # is this unsafe?
+        place[:, :] = Tile.EMPTY.value
+    place[1:-1, 1:-1] = unpadded_grid
 
 class ZoningGameEnv(gym.Env):
     metadata = {"render_modes": ["ansi"]}

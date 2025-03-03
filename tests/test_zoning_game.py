@@ -1,7 +1,7 @@
 import numpy as np
 from nltk.tree import Tree
 
-from nsai_experiments.zoning_game.zg_gym import ZoningGameEnv, Tile, eval_tile_indiv_score, pad_grid
+from nsai_experiments.zoning_game.zg_gym import ZoningGameEnv, Tile, eval_tile_indiv_score, pad_grid, blank_of_size
 from nsai_experiments.zoning_game.zg_policy import play_one_game, create_policy_random, create_policy_indiv_greedy, create_policy_total_greedy
 from nsai_experiments.zoning_game.zg_cfg import ZONING_GAME_GRAMMAR, RuleNT, generate_one_probabilistic, format_ruleset, parse_to_ast, parse_to_nt, interpret_grid
 
@@ -18,15 +18,12 @@ tp = Tile.PARK.value
 T_ = True
 F_ = False
 
-def _blank_of_size(grid_size, fill_tile = Tile.EMPTY):
-    return np.ones((grid_size, grid_size), dtype=np.int32) * fill_tile.value
-
 def _compute_location_based_score(grid_size, fill_tile):
     myenv = ZoningGameEnv(grid_size=grid_size)
     result = np.zeros((grid_size, grid_size), np.int32)
     for row, col in np.ndindex(result.shape):
         myenv.reset(seed=0)
-        myenv.tile_grid = _blank_of_size(grid_size)
+        myenv.tile_grid = blank_of_size(grid_size)
         myenv.tile_grid[row, col] = fill_tile.value
         padded_grid = pad_grid(myenv.tile_grid)
         result[row, col] = eval_tile_indiv_score(padded_grid, row, col)
@@ -51,7 +48,7 @@ def test_indiv_score():
 
     ## Tile.RESIDENTIAL
     # Test with various neighbor configurations
-    base_grid = _blank_of_size(myenv.grid_size)
+    base_grid = blank_of_size(myenv.grid_size)
     base_grid[1, 1] = Tile.RESIDENTIAL.value
 
     # No neighbors -> score is 0
@@ -94,7 +91,7 @@ def test_indiv_score():
 
     ## Tile.COMMERCIAL
     # Test with various neighbor configurations
-    base_grid = _blank_of_size(myenv.grid_size)
+    base_grid = blank_of_size(myenv.grid_size)
     base_grid[1, 1] = Tile.COMMERCIAL.value
 
     # No neighbors -> score is 0
@@ -179,7 +176,7 @@ def test_indiv_score():
         assert (result == answer).all()
     
     # Next, test neighbors
-    base_grid = _blank_of_size(myenv.grid_size)
+    base_grid = blank_of_size(myenv.grid_size)
     base_grid[1, 1] = Tile.DOWNTOWN.value
 
     # No neighbors -> score is 0
@@ -201,7 +198,7 @@ def test_indiv_score():
     
     ## Tile.PARK
     # Test with various neighbor configurations
-    base_grid = _blank_of_size(myenv.grid_size)
+    base_grid = blank_of_size(myenv.grid_size)
     base_grid[1, 1] = Tile.PARK.value
 
     # No neighbors -> score is 0
