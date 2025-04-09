@@ -295,6 +295,9 @@ class ZoningGameEnv(gym.Env):
                 logger.debug(f"Adding {score_incr} to score for tile {current_tile.name} at {(row, col)}")
         return total_score
 
+def flatten_zg_obs(sub_obs):
+    return np.concat((sub_obs[0].flatten(), sub_obs[1]))
+
 class ZoningGameObservationWrapper(gym.ObservationWrapper):
     def __init__(self, sub_env):
         super().__init__(sub_env)
@@ -302,7 +305,7 @@ class ZoningGameObservationWrapper(gym.ObservationWrapper):
         self.observation_space = spaces.MultiDiscrete([len(Tile)]*total_grid_cells*2)
     
     def observation(self, sub_obs):
-        return np.concat((sub_obs[0].flatten(), sub_obs[1]))
+        return flatten_zg_obs(sub_obs)
 
 gym.register(
     id="zg/ZoningGameEnv-v0",
