@@ -1,7 +1,9 @@
 from abc import ABC, abstractmethod
-from typing import Tuple, Any, TypeVar, Generic
+from typing import Tuple, Any, TypeVar, Generic, Hashable
 
 from gymnasium import Env, Space
+import numpy as np
+from numpy.typing import ArrayLike
 
 ObsType = TypeVar("ObsType")
 ActType = TypeVar("ActType")
@@ -14,10 +16,18 @@ class Game(ABC, Generic[ObsType, ActType]):
     fields `action_space` and `observation_space`.
     """
 
-    state: ObsType | None
+    obs: ObsType | None
+    reward: float | None
+    terminated: bool | None
+    truncated: bool | None
+    info: dict[str, Any] | None
 
     def __init__(self):
-        self.state = None
+        self.obs = None
+        self.reward = None
+        self.terminated = None
+        self.truncated = None
+        self.info = None
 
     @abstractmethod
     def step(self, action: ActType) -> Tuple[ObsType, Any, bool, bool, dict[str, Any]]:
@@ -27,19 +37,48 @@ class Game(ABC, Generic[ObsType, ActType]):
     def reset(self) -> Tuple[ObsType, dict[str, Any]]:
         pass
 
+    @abstractmethod
+    def get_action_mask(self) -> Any:
+        pass
+
+    @classmethod
+    def _hashable_obs_impl(cls, obs) -> Hashable:
+        # PERF this might be rather non-performant, seeking generality right now
+        try:
+            hash(obs)
+            return obs
+        except TypeError:
+            if isinstance(obs, list) or isinstance(obs, tuple):
+                return tuple(cls._hashable_obs_impl(sub_obs) for sub_obs in obs)
+            try:
+                arr = np.asarray(obs)
+                return arr.tobytes()
+            except:
+                raise TypeError(f"Generic implementation of `_hashable_obs_impl` failed to make observation {obs} hashable. Please implement your own `_hashable_obs_impl` classmethod or `hashable_obs` property")
+    
+    @property
+    def hashable_obs(self) -> Hashable:
+        "Returns a hashable representation of the current observation `obs`."
+        return self._hashable_obs_impl(self.obs)
+
     def reset_wrapper(self, *args, **kwargs):
         obs, info = self.reset(*args, **kwargs)
-        self.state = obs
+        self.obs = obs
+        self.reward = None
+        self.terminated = None
+        self.truncated = None
+        self.info = info
         return obs, info
     
     def step_wrapper(self, action: ActType) -> Tuple[ObsType, Any, bool, bool, dict[str, Any]]:
         obs, reward, terminated, truncated, info = self.step(action)
-        self.state = obs
+        self.obs = obs
+        self.reward = reward
+        self.terminated = terminated
+        self.truncated = truncated
+        self.info = info
         return obs, reward, terminated, truncated, info
-    
-    @property
-    def get_current_state(self) -> ObsType | None:
-        return self.state
+
 
 class EnvGame(Game[ObsType, ActType]):
     """
@@ -63,6 +102,12 @@ class EnvGame(Game[ObsType, ActType]):
     
     def reset(self, *args, **kwargs) -> Tuple[ObsType, dict[str, Any]]:
         return self.env.reset(*args, **kwargs)
+    
+    def get_action_mask(self, *args, **kwargs):
+        try:
+            return self.env.get_action_mask(*args, **kwargs)  # type: ignore
+        except AttributeError:
+            raise ValueError("Environment must implement `get_action_mask`")
     
     def render(self, *args, **kwargs):
         "For convenience, we provide a `render` method that calls `env`'s `render`."

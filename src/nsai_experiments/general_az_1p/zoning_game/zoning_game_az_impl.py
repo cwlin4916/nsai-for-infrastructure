@@ -1,16 +1,22 @@
+import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from nsai_experiments.zoning_game.zg_gym import ZoningGameEnv, flatten_zg_obs
 from nsai_experiments.general_az_1p.game import EnvGame
 from nsai_experiments.general_az_1p.policy_value_net import TorchPolicyValueNet
+
+from nsai_experiments.zoning_game.zg_gym import ZoningGameEnv, flatten_zg_obs
 from nsai_experiments.zoning_game.zg_gym import Tile
 
 class ZoningGameGame(EnvGame):
     def __init__(self, *args, **kwargs):
         env = ZoningGameEnv(*args, **kwargs)
         super().__init__(env)
+    
+    def get_action_mask(self):
+        tile_grid, _ = self.obs  # type: ignore
+        return np.ravel(tile_grid == Tile.EMPTY.value)
 
 
 class ZoningGameModel(nn.Module):
