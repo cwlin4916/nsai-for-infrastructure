@@ -1,3 +1,4 @@
+from typing import Any
 import warnings
 import copy
 
@@ -10,6 +11,8 @@ from .mcts import MCTS
 class Agent():
     game: Game
     net: PolicyValueNet
+    all_training_examples: list[tuple[Any, tuple[Any, float]]] = []  # Accumulated training examples (state, (policy, reward))
+
     n_games_per_train: int  # Number of games to play for training examples per training call
     n_games_per_eval: int  # Number of games to play in the pitting step per training call
     threshold_to_keep: float  # Threshold for win rate to keep the new network
@@ -61,17 +64,21 @@ class Agent():
     
     def play_and_train(self):
         # Play a bunch of games and keep track of the training examples
-        all_train_examples = []
+        new_train_examples = []  # PERF consider using a deque for efficiency
         for i in range(self.n_games_per_train):
             # print(f"Starting game {i+1} of {self.n_games_per_train}")  # TODO logging
             self.game.reset_wrapper()  # TODO random seed management
             train_examples = self.play_single_game()
-            all_train_examples.extend(train_examples)
+            new_train_examples.extend(train_examples)
         
+        self.all_training_examples.extend(new_train_examples)
+        # TODO currently we never discard old training examples; eventually we probably should
+
         # Save an old Agent to pit ourselves against, then train the network
         self.game.reset_wrapper()
         self_before_training = copy.deepcopy(self)
-        self.net.train(all_train_examples)
+        print(f"Training on {len(self.all_training_examples)} examples")
+        self.net.train(self.all_training_examples)
 
         # Play a bunch of games to evaluate new vs. old networks
         old_rewards, new_rewards = [], []
@@ -103,3 +110,8 @@ class Agent():
         else:
             print("Reverting to the old network")
             self.net = self_before_training.net
+    
+    def play_train_multiple(self, n_trains: int):
+        for i in range(n_trains):
+            print(f"Training iteration {i+1} of {n_trains}: will play {self.n_games_per_train} games, train, and evaluate on {self.n_games_per_eval} games")
+            self.play_and_train()

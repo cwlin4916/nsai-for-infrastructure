@@ -132,7 +132,8 @@ class ZoningGamePolicyValueNet(TorchPolicyValueNet):
                 train_loss += loss
 
             train_losses.append(train_loss / len(train_loader))
-            print(f"Epoch {epoch+1}/{tp['epochs']}, Train Loss: {train_losses[-1]:.4f}")
+            if epoch == 0 or epoch == tp["epochs"] - 1:
+                print(f"Epoch {epoch+1}/{tp['epochs']}, Train Loss: {train_losses[-1]:.4f}")
 
         return model, train_mini_losses, train_losses
 
