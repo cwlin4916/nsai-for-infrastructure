@@ -106,7 +106,10 @@ class ZoningGamePolicyValueNet(TorchPolicyValueNet):
         "policy_weight": 4.0,
     }
 
-    def __init__(self, grid_size = 6, training_params = {}, device = None):
+    def __init__(self, grid_size = 6, random_seed = None, training_params = {}, device = None):
+        if random_seed is not None:
+            torch.manual_seed(random_seed)
+            torch.use_deterministic_algorithms(True, warn_only=True)
         model = ZoningGameModel(grid_size = grid_size)
         super().__init__(model)
         self.training_params = self.default_training_params | training_params

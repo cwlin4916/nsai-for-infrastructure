@@ -13,10 +13,16 @@ from .policy_value_net import PolicyValueNet
 from .mcts import MCTS
 
 class Agent():
+    # Constants
+    RNG_NAMES = ["mcts", "train", "eval"]  # Names for the random number generators to construct
+
+    # State
     game: Game
     net: PolicyValueNet
     all_training_examples: list[tuple[Any, tuple[Any, float]]] = []  # Accumulated training examples (state, (policy, reward))
+    rngs: dict[str, np.random.Generator]
 
+    # Config
     n_games_per_train: int  # Number of games to play for training examples per training call
     n_games_per_eval: int  # Number of games to play in the pitting step per training call
     threshold_to_keep: float  # Threshold for win rate to keep the new network
@@ -30,7 +36,8 @@ class Agent():
                  threshold_to_keep: float = 0.55,
                  reward_discount: float = 1.0,
                  mcts_params: dict | None = None,
-                 n_procs: int | None = None):
+                 n_procs: int | None = None,
+                 random_seeds: dict[str, int] | None = None):
         self.game = game
         self.n_games_per_train = n_games_per_train
         self.n_games_per_eval = n_games_per_eval
@@ -39,15 +46,27 @@ class Agent():
         self.reward_discount = reward_discount
         self.mcts_params = mcts_params if mcts_params is not None else {}
         self.n_procs = n_procs
+        self._construct_rngs(random_seeds if random_seeds is not None else {})
 
-    def play_single_game(self, max_moves: int = 10_000):
+    def _construct_rngs(self, random_seeds: dict[str, int]):
+        self.rngs = {}
+        for rng_name in self.RNG_NAMES:
+            seed = random_seeds.get(rng_name, None)
+            self.rngs[rng_name] = np.random.default_rng(seed)
+        if all(rng_name in random_seeds for rng_name in self.RNG_NAMES):
+            print(f"RNG seeds are fully specified")
+        else:
+            print(f"RNG seeds are not fully specified, using nondeterministic seeds for: {', '.join(rng_name for rng_name in self.RNG_NAMES if rng_name not in random_seeds)}")
+
+    def play_single_game(self, max_moves: int = 10_000, random_seed: int | None = None):
         train_examples = []
         rewards = []
         mcts = MCTS(self.game, self.net, **self.mcts_params)
+        rng = np.random.default_rng(random_seed)
         for i in range(max_moves):
             move_probs = mcts.perform_simulations()
             train_examples.append((self.game.obs, (move_probs, None)))
-            selected_move = np.random.choice(len(move_probs), p=move_probs)
+            selected_move = rng.choice(len(move_probs), p=move_probs)
             # print(f"Taking move {selected_move} with probability {move_probs[selected_move]:.2f}")  # TODO logging
             self.game.step_wrapper(selected_move)
             rewards.append(self.game.reward)
@@ -69,50 +88,54 @@ class Agent():
         
         return train_examples
     
-    def _play_for_examples(self, i):
+    def _play_for_examples(self, i, reset_seed, mcts_seed):
         # print(i)
         logging.getLogger().setLevel(logging.WARN)
-        self.game.reset_wrapper()
-        return self.play_single_game()
-    
-    def _play_for_eval(self, i, self_before_training):
+        self.game.reset_wrapper(seed=reset_seed)
+        return self.play_single_game(random_seed=mcts_seed)
+
+    def _play_for_eval(self, i, reset_seed, mcts_seed, self_before_training):
         # print(i)
         logging.getLogger().setLevel(logging.WARN)
-        self.game.reset_wrapper()
+        self.game.reset_wrapper(seed=reset_seed)
         self_before_training.game = copy.deepcopy(self.game)
         
         # NOTE here we are using the final reward to compare performance -- we may in
         # fact want to use a (weighted?) sum of stepwise rewards
-        self_before_training.play_single_game()
+        self_before_training.play_single_game(random_seed=mcts_seed)
         reward_from_old = self_before_training.game.reward
-        self.play_single_game()
+        self.play_single_game(random_seed=mcts_seed)
         reward_from_new = self.game.reward
         return reward_from_old, reward_from_new
     
-    def _maybe_pool(self, fn, n_iterations, *args):
+    def _starmap(self, fn, arg_tuples):
         """
-        Call function `fn` `n_iterations` times, passing `args` to each call. If
-        `self.n_procs` is None or >= 0, construct a `multiprocessing.Pool` and use
-        `Pool.starmap`; otherwise use `itertools.starmap`.
+        Call `fn(*args)` for each `args in arg_tuples`. If `self.n_procs` is None or >= 0,
+        construct a `multiprocessing.Pool` and use `Pool.starmap`; otherwise use
+        `itertools.starmap`.
         """
-        arg_tuples = [(i, *args) for i in range(n_iterations)]
         if self.n_procs is None or self.n_procs >= 0:
             with Pool(processes=self.n_procs) as pool:
                 results = pool.starmap(fn, arg_tuples)
         else:
-            results = itertools.starmap(fn, arg_tuples)
+            results = list(itertools.starmap(fn, arg_tuples))
         return results
+    
+    def _randseed(self, rng_name: str):
+        "Extract a random integer from RNG `rng_name` suitable for seeding another RNG"
+        return int(self.rngs[rng_name].integers(2**31-1))
 
     def play_and_train(self):
         # Play a bunch of games and keep track of the training examples
         new_train_examples = []  # PERF consider using a deque for efficiency
 
         start_time = time.time()
-        train_example_sets = self._maybe_pool(self._play_for_examples, self.n_games_per_train)
+        arg_tuples = [(i, self._randseed("train"), self._randseed("mcts")) for i in range(self.n_games_per_train)]
+        train_example_sets = self._starmap(self._play_for_examples, arg_tuples)
         for train_examples in train_example_sets:
             new_train_examples.extend(train_examples)
         elapsed = time.time() - start_time
-        print(f"..examples done in {elapsed:.2f} seconds")
+        print(f"..games done in {elapsed:.2f} seconds")
         
         self.all_training_examples.extend(new_train_examples)
         # TODO currently we never discard old training examples; eventually we probably should
@@ -131,7 +154,8 @@ class Agent():
         start_time = time.time()
         # TODO hack: get the network back onto the CPU so multiprocessing can handle it (probably we want an actual interface for this)
         _ = self.net.predict(self.game.obs)
-        eval_results = self._maybe_pool(self._play_for_eval, self.n_games_per_eval, self_before_training)
+        arg_tuples = [(i, self._randseed("eval"), self._randseed("mcts"), self_before_training) for i in range(self.n_games_per_eval)]
+        eval_results = self._starmap(self._play_for_eval, arg_tuples)
         for old_reward, new_reward in eval_results:
             old_rewards.append(old_reward)
             new_rewards.append(new_reward)
