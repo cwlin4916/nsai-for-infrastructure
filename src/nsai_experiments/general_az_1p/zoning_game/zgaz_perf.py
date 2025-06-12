@@ -1,5 +1,10 @@
 "A quick script for Zoning Game AlphaZero performance profiling"
 
+# Limit NumPy multithreading because we're doing our own
+import os
+for lib in ["OMP", "OPENBLAS", "MKL"]:
+    os.environ[f"{lib}_NUM_THREADS"] = "1"
+
 import logging
 
 from nsai_experiments.general_az_1p.game import Game
