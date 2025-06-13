@@ -5,12 +5,14 @@ import time
 from multiprocessing import Pool
 import logging
 import itertools
+import os
 
 import numpy as np
 
 from .game import Game
 from .policy_value_net import PolicyValueNet
 from .mcts import MCTS
+from .utils import THREAD_VARS
 
 class Agent():
     # Constants
@@ -28,7 +30,7 @@ class Agent():
     threshold_to_keep: float  # Threshold for win rate to keep the new network
     reward_discount: float  # For the case where only reward is at the end, set to 1.0 to use end reward at all steps
     mcts_params: dict  # Passed through to MCTS constructor
-    n_procs: int | None  # Number of processes to use in the `multiprocessing.Pool()`; if None, use all available cores, if <= 0 do not use multiprocessing
+    n_procs: int | None  # Number of processes to use in the `multiprocessing.Pool()`; if None, use all available cores, if < 0 do not use multiprocessing
 
     def __init__(self, game: Game, net: PolicyValueNet,
                  n_games_per_train: int = 100,
@@ -46,6 +48,9 @@ class Agent():
         self.reward_discount = reward_discount
         self.mcts_params = mcts_params if mcts_params is not None else {}
         self.n_procs = n_procs
+        if self.n_procs is None or self.n_procs >= 0:
+            if not all([os.environ.get(thread_var, None) == "1" for thread_var in THREAD_VARS]):
+                warnings.warn(f"You have elected to use multiprocessing, but NumPy multithreading is not disabled. This may lead to thread oversubscription. You can disable NumPy multithreading by setting the environment variables {','.join(THREAD_VARS)} to 1 before importing NumPy, or disable multiprocessing by passing n_procs=-1 to the Agent constructor.")
         self._construct_rngs(random_seeds if random_seeds is not None else {})
 
     def _construct_rngs(self, random_seeds: dict[str, int]):
