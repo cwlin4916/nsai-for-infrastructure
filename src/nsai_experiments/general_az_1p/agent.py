@@ -11,7 +11,7 @@ import numpy as np
 
 from .game import Game
 from .policy_value_net import PolicyValueNet
-from .mcts import MCTS
+from .mcts import MCTS, entab
 from .utils import THREAD_VARS
 
 class Agent():
@@ -63,15 +63,18 @@ class Agent():
         else:
             print(f"RNG seeds are not fully specified, using nondeterministic seeds for: {', '.join(rng_name for rng_name in self.RNG_NAMES if rng_name not in random_seeds)}")
 
-    def play_single_game(self, max_moves: int = 10_000, random_seed: int | None = None):
+    def play_single_game(self, max_moves: int = 10_000, random_seed: int | None = None, msg = ""):
         train_examples = []
         rewards = []
         mcts = MCTS(self.game, self.net, **self.mcts_params)
         rng = np.random.default_rng(random_seed)
         for i in range(max_moves):
-            move_probs = mcts.perform_simulations()
+            if msg: print(msg, f"starting move {i}")
+            move_probs = mcts.perform_simulations(entab(msg, f", move {i+1}"))
+            self.game = mcts.game  # TODO HACK because MCTS modifies the game state in place
             train_examples.append((self.game.obs, (move_probs, None)))
             selected_move = rng.choice(len(move_probs), p=move_probs)
+            if msg: print(msg, "obs", self.game.obs, "hobs", self.game.hashable_obs, "move_probs", move_probs, "selmove", selected_move)
             # print(f"Taking move {selected_move} with probability {move_probs[selected_move]:.2f}")  # TODO logging
             self.game.step_wrapper(selected_move)
             rewards.append(self.game.reward)
@@ -104,13 +107,17 @@ class Agent():
         logging.getLogger().setLevel(logging.WARN)
         self.game.reset_wrapper(seed=reset_seed)
         self_before_training.game = copy.deepcopy(self.game)
+        # print("obs", self.game.obs, self_before_training.game.obs)
         
         # NOTE here we are using the final reward to compare performance -- we may in
         # fact want to use a (weighted?) sum of stepwise rewards
+        # self_before_training.play_single_game(random_seed=mcts_seed, msg=f"old net game {i}")
         self_before_training.play_single_game(random_seed=mcts_seed)
         reward_from_old = self_before_training.game.reward
+        # self.play_single_game(random_seed=mcts_seed, msg=f"new net game {i}")
         self.play_single_game(random_seed=mcts_seed)
         reward_from_new = self.game.reward
+        print("Reward from old:", reward_from_old, "Reward from new:", reward_from_new)
         return reward_from_old, reward_from_new
     
     def _starmap(self, fn, arg_tuples):
@@ -148,6 +155,17 @@ class Agent():
         # Save an old Agent to pit ourselves against, then train the network
         self.game.reset_wrapper()
         self_before_training = copy.deepcopy(self)
+
+        # Sanity check: game states and network predictions on current state should be the
+        # same before we train, assuming the network is deterministic. PyTorch inherent
+        # nondeterminism seems to be large enough that we sometimes need the isclose
+        assert all(self.game.obs == self_before_training.game.obs)
+        assert self.game.hashable_obs == self_before_training.game.hashable_obs
+        p1, v1 = self.net.predict(self.game.obs)
+        p2, v2 = self_before_training.net.predict(self_before_training.game.obs)
+        assert all(np.isclose(p1, p2))
+        assert np.isclose(v1, v2)
+
         print(f"Training on {len(self.all_training_examples)} examples")
         start_time = time.time()
         self.net.train(self.all_training_examples)
@@ -159,6 +177,8 @@ class Agent():
         start_time = time.time()
         # TODO hack: get the network back onto the CPU so multiprocessing can handle it (probably we want an actual interface for this)
         _ = self.net.predict(self.game.obs)
+        print("pred on old", self_before_training.game.obs, self_before_training.net.predict(self_before_training.game.obs))
+        print("pred on new", self.game.obs, self.net.predict(self.game.obs))
         arg_tuples = [(i, self._randseed("eval"), self._randseed("mcts"), self_before_training) for i in range(self.n_games_per_eval)]
         eval_results = self._starmap(self._play_for_eval, arg_tuples)
         for old_reward, new_reward in eval_results:
@@ -172,12 +192,16 @@ class Agent():
         old_rewards = np.array(old_rewards)
         new_rewards = np.array(new_rewards)
 
-        print(f"Old network average reward: {old_rewards.mean()}")
-        print(f"New network average reward: {new_rewards.mean()}")
+        print(f"Old network average reward: {old_rewards.mean():.2f}, min: {old_rewards.min():.2f}, max: {old_rewards.max():.2f}, stdev: {old_rewards.std():.2f}")
+        print(f"New network average reward: {new_rewards.mean():.2f}, min: {new_rewards.min():.2f}, max: {new_rewards.max():.2f}, stdev: {new_rewards.std():.2f}")
         
-        new_wins = np.sum(new_rewards > old_rewards)  # NOTE ties currently go to the old network
-        print(f"New network won {new_wins} out of {self.n_games_per_eval} games ({new_wins / self.n_games_per_eval:.2%})")
-        if new_wins / self.n_games_per_eval >= self.threshold_to_keep:
+        wins = np.sum((new_rewards > old_rewards) & ~(np.isclose(new_rewards, old_rewards)))
+        ties = np.sum(np.isclose(new_rewards, old_rewards))
+        losses = np.sum((new_rewards < old_rewards) & ~(np.isclose(new_rewards, old_rewards)))
+        assert wins + ties + losses == self.n_games_per_eval
+        score = (wins + ties / 2) / self.n_games_per_eval  # a tie is half a win
+        print(f"New network won {wins} and tied {ties} out of {self.n_games_per_eval} games ({score:.2%} wins where ties are half wins)")
+        if score >= self.threshold_to_keep:
             print("Keeping the new network")
         else:
             print("Reverting to the old network")

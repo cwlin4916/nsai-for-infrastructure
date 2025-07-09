@@ -9,6 +9,9 @@ from .policy_value_net import PolicyValueNet
 
 EPS = 1e-8  # Add to UCB numerator to avoid zeroing out the policy when total_N is 0
 
+def entab(s, addl):
+    return "  " + s + addl if s else ""
+
 class MCTSTreeNode():
     direct_reward: float  # Any direct reward from the Game for being in this state
     is_terminal_state: bool  # Whether this is an end state (terminated or truncated)
@@ -51,44 +54,56 @@ class MCTS():
         self.temperature = temperature
         self.c_exploration = c_exploration
 
-    def perform_simulations(self):
+    def perform_simulations(self, msg):
         """
         Perform `n_simulations` simulations from the current game state, then return move
         probabilities from exponentiated visit counts
         """
         mystate = self.game.hashable_obs
+        if msg: print(msg, "at start of perform_simulations, obs is", self.game.obs)
         for i in range(self.n_simulations):
             old_game_state = self.game.stash_state()
-            self.search()
+            self.search(entab(msg,  f", simulation {i+1}/{self.n_simulations}"))
             self.game = self.game.unstash_state(old_game_state)
             assert mystate == self.game.hashable_obs
         
         mynode = self.nodes[mystate]
         counts = [mynode.action_N.get(a, 0) for a in range(len(mynode.nn_policy))]  # dictionary lookup misses in the case of action masked
+        if msg: print(msg, "mynode", mynode, "counts", counts)
         counts = np.array(counts) ** (1./self.temperature)
         probs = counts / sum(counts)
         return probs
         
-    def search(self) -> float:
+    def search(self, msg) -> float:
         # NOTE does not guarantee that self.game will be in the same state upon exit
         mystate = self.game.hashable_obs
+        # TODO HACK to get the step count
+        if msg: print(msg, "BEGIN: searching state", self.game.obs, "step_count", self.game.env.step_count, "hash", hash(self.game.hashable_obs), "len nodes", len(self.nodes))
 
         # Initialize node if we've not been here before
         if mystate not in self.nodes:
             reward: float = self.game.reward  # type: ignore
             is_terminal: bool = self.game.terminated or self.game.truncated  # type: ignore
+            if msg: print(msg, "adding node", self.game.obs, "hash", hash(self.game.hashable_obs), "terminated", self.game.terminated, "truncated", self.game.truncated, "reward", reward)
             self.nodes[mystate] = MCTSTreeNode(reward, is_terminal)
         mynode = self.nodes[mystate]
         
         # Base case: in a terminal state, return the direct reward
         if mynode.is_terminal_state:
+            if msg: print(msg, "Reached terminal state", self.game.obs, "reward", mynode.direct_reward)
             return mynode.direct_reward
         
         # Base case: at a new node, query the policy-value network
         if mynode.nn_policy is None:
+            if msg: print(msg, "Reached unexpanded node")
             assert mynode.nn_value is None
             
             mypolicy, myvalue = self.net.predict(self.game.obs)
+            if msg: print(msg, "Queried NN: policy", mypolicy, "value", myvalue)
+            if len(mypolicy.shape) != 1:
+                raise ValueError(f"Expected policy to be 1D, got {mypolicy.shape}")
+            if len(myvalue.shape) != 0:
+                raise ValueError(f"Expected value to be scalar, got {myvalue.shape}")
             myaction_mask = self.game.get_action_mask()
             
             if sum(myaction_mask) == 0:
@@ -107,10 +122,12 @@ class MCTS():
             return myvalue
         
         # Recursive case: select the best action using UCB with action masking and descend the tree
-        ucbs = [self.masked_ucb(mynode, action) for action in range(len(mynode.nn_policy))]
+        ucbs = [self.masked_ucb(mynode, action, entab(msg, " ucb")) for action in range(len(mynode.nn_policy))]
         best_action: int = np.argmax(ucbs)  # type: ignore
+        if msg: print(msg, "-> taking action", best_action, "based on UCBs", ucbs)
         self.game.step_wrapper(best_action)
-        reward = self.search()
+        reward = self.search(entab(msg, " recurse"))
+        # reward = self.search("")
         
         self.update_edge(mynode, best_action, reward)
         mynode.total_N += 1
@@ -118,17 +135,20 @@ class MCTS():
         return reward
 
     # TODO if we decide to keep MCTSTreeNode, maybe some of these should be methods of that class
-    def calc_ucb(self, mynode: MCTSTreeNode, action: int) -> float:
+    def calc_ucb(self, mynode: MCTSTreeNode, action: int, msg) -> float:
         assert mynode.total_N == sum(mynode.action_N.values())
         myaction_Q = mynode.action_Q.get(action, 0.0)
         myaction_N = mynode.action_N.get(action, 0)
-        return myaction_Q + self.c_exploration * mynode.nn_policy[action] * \
+        if len(msg) > 0: print(msg, "calc_ucb for action", action, "action Q", myaction_Q, "c_exploration", self.c_exploration, "nn policy", mynode.nn_policy[action], "total N", mynode.total_N, "action N", myaction_N)
+        result = myaction_Q + self.c_exploration * mynode.nn_policy[action] * \
             np.sqrt(mynode.total_N + EPS) / (1 + myaction_N)
+        if len(msg) > 0: print(msg, "ucb result", result)
+        return result
     
-    def masked_ucb(self, mynode: MCTSTreeNode, action: int) -> float:
+    def masked_ucb(self, mynode: MCTSTreeNode, action: int, msg) -> float:
         if not mynode.action_mask[action]:
             return -np.inf
-        return self.calc_ucb(mynode, action)
+        return self.calc_ucb(mynode, action, msg)
     
     def update_edge(self, mynode: MCTSTreeNode, action: int, reward: float):
         if action not in mynode.action_N:
