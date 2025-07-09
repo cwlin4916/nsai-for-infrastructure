@@ -117,7 +117,7 @@ class Agent():
         # self.play_single_game(random_seed=mcts_seed, msg=f"new net game {i}")
         self.play_single_game(random_seed=mcts_seed)
         reward_from_new = self.game.reward
-        print("Reward from old:", reward_from_old, "Reward from new:", reward_from_new)
+        # print(f"Reward from old: {reward_from_old:.2f}, Reward from new: {reward_from_new:.2f}")
         return reward_from_old, reward_from_new
     
     def _starmap(self, fn, arg_tuples):
@@ -177,8 +177,8 @@ class Agent():
         start_time = time.time()
         # TODO hack: get the network back onto the CPU so multiprocessing can handle it (probably we want an actual interface for this)
         _ = self.net.predict(self.game.obs)
-        print("pred on old", self_before_training.game.obs, self_before_training.net.predict(self_before_training.game.obs))
-        print("pred on new", self.game.obs, self.net.predict(self.game.obs))
+        # print("pred on old", self_before_training.game.obs, self_before_training.net.predict(self_before_training.game.obs))
+        # print("pred on new", self.game.obs, self.net.predict(self.game.obs))
         arg_tuples = [(i, self._randseed("eval"), self._randseed("mcts"), self_before_training) for i in range(self.n_games_per_eval)]
         eval_results = self._starmap(self._play_for_eval, arg_tuples)
         for old_reward, new_reward in eval_results:

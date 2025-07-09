@@ -10,7 +10,7 @@ from nsai_experiments.general_az_1p.policy_value_net import TorchPolicyValueNet
 class CumulativeRewardWrapper(gym.Wrapper):
     """Wrapper that changes reward behavior: 0 at every step, total steps at termination."""
     
-    def __init__(self, env, max_steps = 20):
+    def __init__(self, env, max_steps = 100):
         super().__init__(env)
         self.step_count = 0
         self.max_steps = max_steps
@@ -147,8 +147,8 @@ class CartPolePolicyValueNet(TorchPolicyValueNet):
                 value_loss += loss_value
 
             train_losses.append(train_loss / len(train_loader))
-            # if epoch == 0 or epoch == tp["epochs"] - 1:
-            if True:
+            if epoch == 0 or epoch == tp["epochs"] - 1:
+            # if True:
                 print(f"Epoch {epoch+1}/{tp['epochs']}, Train Loss: {train_losses[-1]:.4f} (value: {value_loss / len(train_loader):.4f}, policy: {policy_loss / len(train_loader):.4f}, weighted policy: {policy_weight * (policy_loss / len(train_loader)):.4f})")
 
         return model, train_mini_losses, train_losses
