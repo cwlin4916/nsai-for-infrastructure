@@ -6,6 +6,7 @@ from multiprocessing import Pool
 import logging
 import itertools
 import os
+from copy import deepcopy
 
 import numpy as np
 
@@ -73,9 +74,10 @@ class Agent():
         rng = np.random.default_rng(random_seed)
         for i in range(max_moves):
             if msg: print(msg, f"starting move {i}")
-            move_probs = mcts.perform_simulations(entab(msg, f", move {i+1}"))
+            move_probs = mcts.perform_simulations(entab(msg, f", m{i+1}"))
             self.game = mcts.game  # TODO HACK because MCTS modifies the game state in place
-            train_examples.append((self.game.obs, (move_probs, None)))
+#            train_examples.append((self.game.obs, (move_probs, None)))
+            train_examples.append((deepcopy(self.game.obs), (move_probs, None)))
             selected_move = rng.choice(len(move_probs), p=move_probs)
             if msg: print(msg, "obs", self.game.obs, "hobs", self.game.hashable_obs, "move_probs", move_probs, "selmove", selected_move)
             # print(f"Taking move {selected_move} with probability {move_probs[selected_move]:.2f}")  # TODO logging
@@ -103,7 +105,8 @@ class Agent():
         # print(i)
         logging.getLogger().setLevel(logging.WARN)
         self.game.reset_wrapper(seed=reset_seed)
-        return self.play_single_game(random_seed=mcts_seed)
+        return self.play_single_game(random_seed=mcts_seed, msg="play4egs g{}".format(i))
+#        return self.play_single_game(random_seed=mcts_seed)
 
     def _play_for_eval(self, i, reset_seed, mcts_seed, self_before_training):
         # print(i)
@@ -168,49 +171,54 @@ class Agent():
         assert self.game.hashable_obs == self_before_training.game.hashable_obs
         p1, v1 = self.net.predict(self.game.obs)
         p2, v2 = self_before_training.net.predict(self_before_training.game.obs)
+        print (p1, p2)
         assert all(np.isclose(p1, p2))
         assert np.isclose(v1, v2)
 
         print(f"Training on {len(flat_examples)} examples")
+        for i, (state, (policy, reward)) in enumerate(flat_examples):
+            print(f"Example {i+1}/{len(flat_examples)}: state={state}, policy={policy}, reward={reward}")
         start_time = time.time()
         self.net.train(flat_examples)
         elapsed = time.time() - start_time
         print(f"..training done in {elapsed:.2f} seconds")
 
-        # Play a bunch of games to evaluate new vs. old networks
-        old_rewards, new_rewards = [], []
-        start_time = time.time()
-        # TODO hack: get the network back onto the CPU so multiprocessing can handle it (probably we want an actual interface for this)
-        _ = self.net.predict(self.game.obs)
-        # print("pred on old", self_before_training.game.obs, self_before_training.net.predict(self_before_training.game.obs))
-        # print("pred on new", self.game.obs, self.net.predict(self.game.obs))
-        arg_tuples = [(i, self._randseed("eval"), self._randseed("mcts"), self_before_training) for i in range(self.n_games_per_eval)]
-        eval_results = self._starmap(self._play_for_eval, arg_tuples)
-        for old_reward, new_reward in eval_results:
-            old_rewards.append(old_reward)
-            new_rewards.append(new_reward)
+        do_pit = True
+        if do_pit:
+            # Play a bunch of games to evaluate new vs. old networks
+            old_rewards, new_rewards = [], []
+            start_time = time.time()
+            # TODO hack: get the network back onto the CPU so multiprocessing can handle it (probably we want an actual interface for this)
+            _ = self.net.predict(self.game.obs)
+            # print("pred on old", self_before_training.game.obs, self_before_training.net.predict(self_before_training.game.obs))
+            # print("pred on new", self.game.obs, self.net.predict(self.game.obs))
+            arg_tuples = [(i, self._randseed("eval"), self._randseed("mcts"), self_before_training) for i in range(self.n_games_per_eval)]
+            eval_results = self._starmap(self._play_for_eval, arg_tuples)
+            for old_reward, new_reward in eval_results:
+                old_rewards.append(old_reward)
+                new_rewards.append(new_reward)
 
-        elapsed = time.time() - start_time
-        print(f"..evaluation done in {elapsed:.2f} seconds")
+            elapsed = time.time() - start_time
+            print(f"..evaluation done in {elapsed:.2f} seconds")
 
-        # Print stats, keep new network iff it wins >= threshold_to_keep fraction of games
-        old_rewards = np.array(old_rewards)
-        new_rewards = np.array(new_rewards)
+            # Print stats, keep new network iff it wins >= threshold_to_keep fraction of games
+            old_rewards = np.array(old_rewards)
+            new_rewards = np.array(new_rewards)
 
-        print(f"Old network average reward: {old_rewards.mean():.2f}, min: {old_rewards.min():.2f}, max: {old_rewards.max():.2f}, stdev: {old_rewards.std():.2f}")
-        print(f"New network average reward: {new_rewards.mean():.2f}, min: {new_rewards.min():.2f}, max: {new_rewards.max():.2f}, stdev: {new_rewards.std():.2f}")
-        
-        wins = np.sum((new_rewards > old_rewards) & ~(np.isclose(new_rewards, old_rewards)))
-        ties = np.sum(np.isclose(new_rewards, old_rewards))
-        losses = np.sum((new_rewards < old_rewards) & ~(np.isclose(new_rewards, old_rewards)))
-        assert wins + ties + losses == self.n_games_per_eval
-        score = (wins + ties / 2) / self.n_games_per_eval  # a tie is half a win
-        print(f"New network won {wins} and tied {ties} out of {self.n_games_per_eval} games ({score:.2%} wins where ties are half wins)")
-        if score >= self.threshold_to_keep:
-            print("Keeping the new network")
-        else:
-            print("Reverting to the old network")
-            self.net = self_before_training.net
+            print(f"Old network average reward: {old_rewards.mean():.2f}, min: {old_rewards.min():.2f}, max: {old_rewards.max():.2f}, stdev: {old_rewards.std():.2f}")
+            print(f"New network average reward: {new_rewards.mean():.2f}, min: {new_rewards.min():.2f}, max: {new_rewards.max():.2f}, stdev: {new_rewards.std():.2f}")
+            
+            wins = np.sum((new_rewards > old_rewards) & ~(np.isclose(new_rewards, old_rewards)))
+            ties = np.sum(np.isclose(new_rewards, old_rewards))
+            losses = np.sum((new_rewards < old_rewards) & ~(np.isclose(new_rewards, old_rewards)))
+            assert wins + ties + losses == self.n_games_per_eval
+            score = (wins + ties / 2) / self.n_games_per_eval  # a tie is half a win
+            print(f"New network won {wins} and tied {ties} out of {self.n_games_per_eval} games ({score:.2%} wins where ties are half wins)")
+            if score >= self.threshold_to_keep:
+                print("Keeping the new network")
+            else:
+                print("Reverting to the old network")
+                self.net = self_before_training.net
     
     def play_train_multiple(self, n_trains: int):
         for i in range(n_trains):

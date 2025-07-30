@@ -7,9 +7,14 @@ import torch.nn.functional as F
 from nsai_experiments.general_az_1p.game import EnvGame
 from nsai_experiments.general_az_1p.policy_value_net import TorchPolicyValueNet
 from nsai_experiments.general_az_1p.utils import get_accelerator
+from nsai_experiments.general_az_1p.agent import Agent
+from nsai_experiments.general_az_1p.mcts import MCTS, entab
 
 import gymnasium.spaces as spaces
 from typing import Hashable
+import warnings
+from copy import deepcopy
+
 
 
 class CumulativeRewardWrapper(gym.Wrapper):
@@ -263,6 +268,64 @@ class BitStringPolicyValueNet(TorchPolicyValueNet):
         return policy_prob, value
 
 
+class BitStringAgent(Agent):
+    """
+    This class is a simple agent that plays the BitStringGame perfectly to generate training data.
+    """
+
+    def get_exact_move_probs(self, msg: str = "") -> np.ndarray:
+        """
+        Returns the exact move probabilities for the current game state.
+        """
+        if msg: print(msg, "Calculating exact move probabilities for", self.game.obs)
+        # return the exact move probabilities
+        # based on the current game state. 
+        probs = np.zeros(self.game.env.nsites, dtype=np.float32)
+        for i in range(self.game.env.nsites):
+            if self.game.obs[i] == 0:
+                probs[i] = 1.0
+            else:
+                probs[i] = 0.0
+        probs /= np.sum(probs)  # Normalize to make it a probability distribution
+        if msg: print(msg, "Exact move probabilities:", probs)
+        return probs
+
+    def play_single_game(self, max_moves: int = 10_000, random_seed: int | None = None, msg = ""):
+        train_examples = []
+        rewards = []
+        # mcts = MCTS(self.game, self.net, **self.mcts_params)
+        rng = np.random.default_rng(random_seed)
+        for i in range(max_moves):
+            if msg: print(msg, f"starting move {i}")
+            # move_probs = mcts.perform_simulations(entab(msg, f", m{i+1}"))
+            # self.game = mcts.game  # TODO HACK because MCTS modifies the game state in place
+            move_probs = self.get_exact_move_probs(entab(msg, f", m{i+1}"))
+            train_examples.append((deepcopy(self.game.obs), (move_probs, None)))
+            selected_move = rng.choice(len(move_probs), p=move_probs)
+            if msg: print(msg, "obs", self.game.obs, "hobs", self.game.hashable_obs, "move_probs", move_probs, "selmove", selected_move)
+            # print(f"Taking move {selected_move} with probability {move_probs[selected_move]:.2f}")  # TODO logging
+            self.game.step_wrapper(selected_move)
+            rewards.append(self.game.reward)
+            if self.game.terminated or self.game.truncated:
+                break
+        else:
+            # In this case, we might not have any reward to work with
+            warnings.warn(f"`play_single_game` timed out after {max_moves} moves without termination/truncation, returning no training examples")
+            return []
+
+        # Propagate rewards backwards through steps
+        for i in range(len(rewards) - 1, 0, -1):
+            rewards[i-1] += self.reward_discount * rewards[i]
+        
+        # Attach rewards to training examples
+        for i in range(len(train_examples)):
+            state, (policy, _) = train_examples[i]
+            train_examples[i] = (state, (policy, rewards[i]))
+        
+        return train_examples
+
+    
+
 if __name__ == "__main__":
     from nsai_experiments.general_az_1p.utils import disable_numpy_multithreading, use_deterministic_cuda
     disable_numpy_multithreading()
@@ -275,14 +338,16 @@ if __name__ == "__main__":
     from nsai_experiments.general_az_1p.bitstring.bitstring_az_impl import BitStringGame
     from nsai_experiments.general_az_1p.bitstring.bitstring_az_impl import BitStringPolicyValueNet
 
-    nsites = 6  # Number of bits in the bitstring
+    nsites = 12  # Number of bits in the bitstring
     mygame = BitStringGame(nsites = nsites)
     # mynet = CartPolePolicyValueNet(random_seed=47, training_params={"epochs": 10, "learning_rate": 0.01, "policy_weight": 4.0})
     mynet = BitStringPolicyValueNet(random_seed=47, nsites=nsites, training_params={"epochs": 10, "learning_rate": 0.01, "policy_weight": 2.0})
     # myagent = Agent(mygame, mynet, random_seeds={"mcts": 48, "train": 49, "eval": 50}, threshold_to_keep=-1.0, n_games_per_eval=1, mcts_params={"n_simulations": 5})
     # myagent = Agent(mygame, mynet, random_seeds={"mcts": 48, "train": 49, "eval": 50}, threshold_to_keep=-1.0, n_procs=-1)
     # myagent = Agent(mygame, mynet, random_seeds={"mcts": 48, "train": 49, "eval": 50}, threshold_to_keep=-1.0)
-    myagent = Agent(mygame, mynet, n_procs=-1, n_games_per_train=10, random_seeds={"mcts": 48, "train": 49, "eval": 50}, mcts_params={"c_exploration": 1})
+#    myagent = BitStringAgent(mygame, mynet, n_procs=-1, n_games_per_train=50, n_games_per_eval=10, random_seeds={"mcts": 48, "train": 49, "eval": 50}, mcts_params={"c_exploration": 1})
+    myagent = Agent(mygame, mynet, n_procs=-1, n_games_per_train=50, n_games_per_eval=10, threshold_to_keep=0.4,
+                    random_seeds={"mcts": 48, "train": 49, "eval": 50}, mcts_params={"c_exploration": 1})
 
 
     myagent.play_train_multiple(5)    
