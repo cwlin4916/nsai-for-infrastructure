@@ -62,10 +62,11 @@ class BitStringGameGym(gym.Env):
         >>> EnvTest.action_space=spaces.Discrete(2)
         """
         self.bitflipmode = True  # "setting" a 1 flips it  back to 0
-        self.sparsemode = True  # score is only given at end of (fixed length?) episode
+        self.sparsemode = False  # score is only given at end of (fixed length?) episode
+        self.nones = 2 # number of bits that are initially set to 1
 
         self.nsites = nsites
-        self.max_steps = 2 * nsites if not self.sparsemode else nsites
+        self.max_steps = 2 * nsites if not self.sparsemode else nsites - self.nones
         self.observation_space = spaces.MultiBinary([self.nsites]) #, seed=42)
         self.action_space = spaces.Discrete(self.nsites)
         self.reset()
@@ -103,8 +104,8 @@ class BitStringGameGym(gym.Env):
         normalizer = self.nsites # playing around with scale of pi vs value loss
         if self.sparsemode:
             r = sum(self.state)/normalizer if done else 0
-        if done:
-            print ("Net Episode done <s, r, t, steps>", self.state, r, done, self.step_count)
+        # if done:
+        #     print ("Net Episode done <s, r, t, steps>", self.state, r, done, self.step_count)
         return self.state, r, done, done, {}
 
     def reset(self, seed = None):
@@ -115,12 +116,11 @@ class BitStringGameGym(gym.Env):
             observation:    array
                             the initial state of the environment
         """
-        nones = 2
         if seed is not None:
             np.random.seed(seed)
             torch.manual_seed(seed)
             torch.use_deterministic_algorithms(True, warn_only=True)
-        ones = np.random.choice(range(self.nsites), nones, replace=False)
+        ones = np.random.choice(range(self.nsites), self.nones, replace=False)
         self.state = np.zeros(self.nsites, dtype=np.float32)
         self.state[ones] = 1
         self.step_count = 0
@@ -144,7 +144,7 @@ class BitStringGame(EnvGame):
         return "".join([str(int(x)) for x in self.obs])  + " " + str(self.env.step_count)# Convert the bitstring to a string of '0's and '1's, which is hashable
 
 class BitStringModel(nn.Module):
-    def __init__(self, nsites = 10, n_hidden_layers = 0, hidden_size = 128):
+    def __init__(self, nsites = 10, n_hidden_layers = 2, hidden_size = 128):
         super().__init__()
         self.input_size = nsites   # observation is a bitstring of length nsites
         self.action_size = nsites  # action is an index of a bit to flip
@@ -338,16 +338,16 @@ if __name__ == "__main__":
     from nsai_experiments.general_az_1p.bitstring.bitstring_az_impl import BitStringGame
     from nsai_experiments.general_az_1p.bitstring.bitstring_az_impl import BitStringPolicyValueNet
 
-    nsites = 12  # Number of bits in the bitstring
+    nsites = 10  # Number of bits in the bitstring
     mygame = BitStringGame(nsites = nsites)
     # mynet = CartPolePolicyValueNet(random_seed=47, training_params={"epochs": 10, "learning_rate": 0.01, "policy_weight": 4.0})
-    mynet = BitStringPolicyValueNet(random_seed=47, nsites=nsites, training_params={"epochs": 10, "learning_rate": 0.01, "policy_weight": 2.0})
+    mynet = BitStringPolicyValueNet(random_seed=47, nsites=nsites, training_params={"epochs": 1, "learning_rate": 1e-4, "policy_weight": 1.0})
     # myagent = Agent(mygame, mynet, random_seeds={"mcts": 48, "train": 49, "eval": 50}, threshold_to_keep=-1.0, n_games_per_eval=1, mcts_params={"n_simulations": 5})
     # myagent = Agent(mygame, mynet, random_seeds={"mcts": 48, "train": 49, "eval": 50}, threshold_to_keep=-1.0, n_procs=-1)
     # myagent = Agent(mygame, mynet, random_seeds={"mcts": 48, "train": 49, "eval": 50}, threshold_to_keep=-1.0)
 #    myagent = BitStringAgent(mygame, mynet, n_procs=-1, n_games_per_train=50, n_games_per_eval=10, random_seeds={"mcts": 48, "train": 49, "eval": 50}, mcts_params={"c_exploration": 1})
-    myagent = Agent(mygame, mynet, n_procs=-1, n_games_per_train=50, n_games_per_eval=10, threshold_to_keep=0.4,
-                    random_seeds={"mcts": 48, "train": 49, "eval": 50}, mcts_params={"c_exploration": 1})
+    myagent = Agent(mygame, mynet, n_games_per_train=1, n_games_per_eval=10, threshold_to_keep=0.4,  n_past_iterations_to_train=5,
+                    random_seeds={"mcts": 48, "train": 49, "eval": 50}, mcts_params={"n_simulations": 30, "c_exploration": 1})
 
 
-    myagent.play_train_multiple(5)    
+    myagent.play_train_multiple(100)    
