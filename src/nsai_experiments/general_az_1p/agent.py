@@ -14,6 +14,10 @@ from .policy_value_net import PolicyValueNet
 from .mcts import MCTS, entab
 from .utils import THREAD_VARS
 
+# Debugging flags:
+DETAILED_DEBUG = False
+PIT_NO_MCTS = True
+
 class Agent():
     # Constants
     RNG_NAMES = ["mcts", "train", "eval"]  # Names for the random number generators to construct
@@ -105,24 +109,37 @@ class Agent():
         self.game.reset_wrapper(seed=reset_seed)
         return self.play_single_game(random_seed=mcts_seed)
 
-    def _play_for_eval(self, i, reset_seed, mcts_seed, self_before_training):
-        # print(i)
+    def _play_for_eval(self, i, reset_seed, mcts_seed, self_before_training, try_without_mcts = False):
+        if DETAILED_DEBUG: print(i)
         logging.getLogger().setLevel(logging.WARN)
         self.game.reset_wrapper(seed=reset_seed)
         self_before_training.game = copy.deepcopy(self.game)
-        # print("obs", self.game.obs, self_before_training.game.obs)
-        
+        if DETAILED_DEBUG: print("obs", self.game.obs, self_before_training.game.obs)
+        if try_without_mcts:
+            self_before_training_no_mcts = copy.deepcopy(self_before_training)
+            self_before_training_no_mcts.mcts_params = {"n_simulations": -1}
+            self_no_mcts = copy.deepcopy(self)
+            self_no_mcts.mcts_params = {"n_simulations": -1}
+        else:
+            self_before_training_no_mcts = None
+            self_no_mcts = None
+
         # NOTE here we are using the final reward to compare performance -- we may in
         # fact want to use a (weighted?) sum of stepwise rewards
-        # self_before_training.play_single_game(random_seed=mcts_seed, msg=f"old net game {i}")
-        self_before_training.play_single_game(random_seed=mcts_seed)
-        reward_from_old = self_before_training.game.reward
-        # self.play_single_game(random_seed=mcts_seed, msg=f"new net game {i}")
-        self.play_single_game(random_seed=mcts_seed)
-        reward_from_new = self.game.reward
-        # print(f"Reward from old: {reward_from_old:.2f}, Reward from new: {reward_from_new:.2f}")
-        return reward_from_old, reward_from_new
-    
+
+        results = []
+        for (agent, label) in [(self_before_training, "old net"), (self, "new net"), (self_before_training_no_mcts, "old net no MCTS"), (self_no_mcts, "new net no MCTS")]:
+            if agent is None:
+                results.append(None)
+                continue
+            agent.play_single_game(random_seed=mcts_seed, msg = f"{label} game {i}" if DETAILED_DEBUG else "")
+            results.append(agent.game.reward)
+
+        if DETAILED_DEBUG: print(f"Reward from old: {results[0]:.2f}, Reward from new: {results[1]:.2f}")
+        if DETAILED_DEBUG and try_without_mcts:
+            print(f"Reward from old no MCTS: {results[2]:.2f}, Reward from new no MCTS: {results[3]:.2f}")
+        return results
+
     def _starmap(self, fn, arg_tuples):
         """
         Call `fn(*args)` for each `args in arg_tuples`. If `self.n_procs` is None or >= 0,
@@ -178,17 +195,19 @@ class Agent():
         print(f"..training done in {elapsed:.2f} seconds")
 
         # Play a bunch of games to evaluate new vs. old networks
-        old_rewards, new_rewards = [], []
+        old_rewards, new_rewards, old_rewards_no_mcts, new_rewards_no_mcts = [], [], [], []
         start_time = time.time()
         # TODO hack: get the network back onto the CPU so multiprocessing can handle it (probably we want an actual interface for this)
         _ = self.net.predict(self.game.obs)
         # print("pred on old", self_before_training.game.obs, self_before_training.net.predict(self_before_training.game.obs))
         # print("pred on new", self.game.obs, self.net.predict(self.game.obs))
-        arg_tuples = [(i, self._randseed("eval"), self._randseed("mcts"), self_before_training) for i in range(self.n_games_per_eval)]
+        arg_tuples = [(i, self._randseed("eval"), self._randseed("mcts"), self_before_training, PIT_NO_MCTS) for i in range(self.n_games_per_eval)]
         eval_results = self._starmap(self._play_for_eval, arg_tuples)
-        for old_reward, new_reward in eval_results:
+        for old_reward, new_reward, old_reward_no_mcts, new_reward_no_mcts in eval_results:
             old_rewards.append(old_reward)
             new_rewards.append(new_reward)
+            old_rewards_no_mcts.append(old_reward_no_mcts)
+            new_rewards_no_mcts.append(new_reward_no_mcts)
 
         elapsed = time.time() - start_time
         print(f"..evaluation done in {elapsed:.2f} seconds")
@@ -196,10 +215,14 @@ class Agent():
         # Print stats, keep new network iff it wins >= threshold_to_keep fraction of games
         old_rewards = np.array(old_rewards)
         new_rewards = np.array(new_rewards)
+        print(f"Old network+MCTS average reward: {old_rewards.mean():.2f}, min: {old_rewards.min():.2f}, max: {old_rewards.max():.2f}, stdev: {old_rewards.std():.2f}")
+        print(f"New network+MCTS average reward: {new_rewards.mean():.2f}, min: {new_rewards.min():.2f}, max: {new_rewards.max():.2f}, stdev: {new_rewards.std():.2f}")
 
-        print(f"Old network average reward: {old_rewards.mean():.2f}, min: {old_rewards.min():.2f}, max: {old_rewards.max():.2f}, stdev: {old_rewards.std():.2f}")
-        print(f"New network average reward: {new_rewards.mean():.2f}, min: {new_rewards.min():.2f}, max: {new_rewards.max():.2f}, stdev: {new_rewards.std():.2f}")
-        
+        old_rewards_no_mcts = np.array(old_rewards_no_mcts)
+        new_rewards_no_mcts = np.array(new_rewards_no_mcts)
+        print(f"Old bare network average reward: {old_rewards_no_mcts.mean():.2f}, min: {old_rewards_no_mcts.min():.2f}, max: {old_rewards_no_mcts.max():.2f}, stdev: {old_rewards_no_mcts.std():.2f}")
+        print(f"New bare network average reward: {new_rewards_no_mcts.mean():.2f}, min: {new_rewards_no_mcts.min():.2f}, max: {new_rewards_no_mcts.max():.2f}, stdev: {new_rewards_no_mcts.std():.2f}")
+
         wins = np.sum((new_rewards > old_rewards) & ~(np.isclose(new_rewards, old_rewards)))
         ties = np.sum(np.isclose(new_rewards, old_rewards))
         losses = np.sum((new_rewards < old_rewards) & ~(np.isclose(new_rewards, old_rewards)))

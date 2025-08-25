@@ -57,20 +57,28 @@ class MCTS():
     def perform_simulations(self, msg):
         """
         Perform `n_simulations` simulations from the current game state, then return move
-        probabilities from exponentiated visit counts
+        probabilities from exponentiated visit counts. Special case: if `n_simulations` is
+        negative, directly query the policy network rather than performing any simulations
+        (results are still exponentiated).
         """
         mystate = self.game.hashable_obs
         if msg: print(msg, "at start of perform_simulations, obs is", self.game.obs)
-        for i in range(self.n_simulations):
-            old_game_state = self.game.stash_state()
-            self.search(entab(msg,  f", simulation {i+1}/{self.n_simulations}"))
-            self.game = self.game.unstash_state(old_game_state)
-            assert mystate == self.game.hashable_obs
+
+        if self.n_simulations < 0:
+            if msg: print(msg, "n_simulations < 0, directly querying policy net")
+            counts, _, _ = self.query_net_masked(msg)
+        else:
+            for i in range(self.n_simulations):
+                old_game_state = self.game.stash_state()
+                self.search(entab(msg,  f", simulation {i+1}/{self.n_simulations}"))
+                self.game = self.game.unstash_state(old_game_state)
+                assert mystate == self.game.hashable_obs
+            
+            mynode = self.nodes[mystate]
+            counts = [mynode.action_N.get(a, 0) for a in range(len(mynode.nn_policy))]  # dictionary lookup misses in the case of action masked
         
-        mynode = self.nodes[mystate]
-        counts = [mynode.action_N.get(a, 0) for a in range(len(mynode.nn_policy))]  # dictionary lookup misses in the case of action masked
         if msg: print(msg, "mynode", mynode, "counts", counts)
-        counts = np.array(counts) ** (1./self.temperature)
+        if self.n_simulations >= 0: counts = np.array(counts) ** (1./self.temperature)
         probs = counts / sum(counts)
         return probs
         
@@ -98,24 +106,7 @@ class MCTS():
             if msg: print(msg, "Reached unexpanded node")
             assert mynode.nn_value is None
             
-            mypolicy, myvalue = self.net.predict(self.game.obs)
-            if msg: print(msg, "Queried NN: policy", mypolicy, "value", myvalue)
-            if len(mypolicy.shape) != 1:
-                raise ValueError(f"Expected policy to be 1D, got {mypolicy.shape}")
-            if len(myvalue.shape) != 0:
-                raise ValueError(f"Expected value to be scalar, got {myvalue.shape}")
-            myaction_mask = self.game.get_action_mask()
-            
-            if sum(myaction_mask) == 0:
-                raise ValueError("Action mask says no valid moves")
-            mypolicy *= myaction_mask
-            sum_policy = mypolicy.sum()
-            if sum_policy > 0:
-                mypolicy /= sum_policy
-            else:
-                warnings.warn("All valid moves have zero probability, ignoring probabilities")
-                mypolicy += myaction_mask / sum(myaction_mask)
-            
+            mypolicy, myvalue, myaction_mask = self.query_net_masked(msg)
             mynode.nn_policy = mypolicy
             mynode.nn_value = myvalue
             mynode.action_mask = myaction_mask
@@ -133,6 +124,33 @@ class MCTS():
         mynode.total_N += 1
         
         return reward
+
+    def query_net(self, msg):
+        "Query the policy-value network and perform some basic validation"
+        mypolicy, myvalue = self.net.predict(self.game.obs)
+        if msg: print(msg, "Queried NN: policy", mypolicy, "value", myvalue)
+        if len(mypolicy.shape) != 1:
+            raise ValueError(f"Expected policy to be 1D, got {mypolicy.shape}")
+        if len(myvalue.shape) != 0:
+            raise ValueError(f"Expected value to be scalar, got {myvalue.shape}")
+        return mypolicy, myvalue
+    
+    def query_net_masked(self, msg):
+        "Run `query_net` and use the game's action mask to zero out invalid moves in the policy"
+        mypolicy, myvalue = self.query_net(msg)
+
+        myaction_mask = self.game.get_action_mask()
+        if sum(myaction_mask) == 0:
+            raise ValueError("Action mask says no valid moves")
+        mypolicy *= myaction_mask
+        sum_policy = mypolicy.sum()
+        if sum_policy > 0:
+            mypolicy /= sum_policy
+        else:
+            warnings.warn("All valid moves have zero probability, ignoring probabilities")
+            mypolicy += myaction_mask / sum(myaction_mask)
+
+        return mypolicy, myvalue, myaction_mask
 
     # TODO if we decide to keep MCTSTreeNode, maybe some of these should be methods of that class
     def calc_ucb(self, mynode: MCTSTreeNode, action: int, msg) -> float:
