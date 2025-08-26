@@ -4,6 +4,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+import gymnasium as gym
 
 from nsai_experiments.general_az_1p.game import EnvGame
 from nsai_experiments.general_az_1p.policy_value_net import TorchPolicyValueNet
@@ -11,9 +12,21 @@ from nsai_experiments.general_az_1p.policy_value_net import TorchPolicyValueNet
 from nsai_experiments.zoning_game.zg_gym import ZoningGameEnv, flatten_zg_obs
 from nsai_experiments.zoning_game.zg_gym import Tile
 
+# multiprocessing doesn't like anonymous functions so we can't use TransformReward(... lambda...)
+class ScaleRewardWrapper(gym.RewardWrapper):
+    def __init__(self, env, scale):
+        super().__init__(env)
+        self.scale = scale
+
+    def reward(self, reward):
+        return reward * self.scale
+
 class ZoningGameGame(EnvGame):
-    def __init__(self, *args, **kwargs):
+    def __init__(self, rescale_rewards = True, *args, **kwargs):
         env = ZoningGameEnv(*args, **kwargs)
+        if rescale_rewards:
+            divisor = env.grid_size*env.grid_size*3  # TODO tune empirically
+            env = ScaleRewardWrapper(env, 1/divisor)
         super().__init__(env)
     
     def get_action_mask(self):
@@ -29,9 +42,9 @@ class ZoningGameGame(EnvGame):
             self.terminated,
             self.truncated,
             copy.deepcopy(self.info),
-            self.env.tile_grid.copy(),  # type: ignore
-            self.env.tile_queue.copy(),  # type: ignore
-            self.env.n_moves  # type: ignore
+            self.env.unwrapped.tile_grid.copy(),  # type: ignore
+            self.env.unwrapped.tile_queue.copy(),  # type: ignore
+            self.env.unwrapped.n_moves  # type: ignore
         )
     
     def unstash_state(self, state):
@@ -46,9 +59,9 @@ class ZoningGameGame(EnvGame):
         self.terminated = terminated
         self.truncated = truncated
         self.info = info
-        self.env.tile_grid = tile_grid  # type: ignore
-        self.env.tile_queue = tile_queue  # type: ignore
-        self.env.n_moves = n_moves  # type: ignore
+        self.env.unwrapped.tile_grid = tile_grid  # type: ignore
+        self.env.unwrapped.tile_queue = tile_queue  # type: ignore
+        self.env.unwrapped.n_moves = n_moves  # type: ignore
         return self
 
 
@@ -185,4 +198,4 @@ class ZoningGamePolicyValueNet(TorchPolicyValueNet):
         with torch.no_grad():
             policy, value = self.model(nn_input)
             policy_prob = F.softmax(policy, dim=-1)
-        return policy_prob.numpy().squeeze(), value.item()
+        return policy_prob.numpy().squeeze(), value.numpy().squeeze()

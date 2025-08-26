@@ -181,7 +181,7 @@ class Agent():
         # Sanity check: game states and network predictions on current state should be the
         # same before we train, assuming the network is deterministic. PyTorch inherent
         # nondeterminism seems to be large enough that we sometimes need the isclose
-        assert all(self.game.obs == self_before_training.game.obs)
+        # assert all(self.game.obs == self_before_training.game.obs)
         assert self.game.hashable_obs == self_before_training.game.hashable_obs
         p1, v1 = self.net.predict(self.game.obs)
         p2, v2 = self_before_training.net.predict(self_before_training.game.obs)
