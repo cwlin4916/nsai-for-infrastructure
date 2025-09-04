@@ -112,11 +112,13 @@ class ZoningGamePolicyValueNet(TorchPolicyValueNet):
     save_file_name = "zg_checkpoint.pt"
     default_training_params = {
         "epochs": 10,
-        "batch_size": 1024,
-        "learning_rate": 0.005,
+        "batch_size": 2048,
+        "learning_rate": 0.001,
         "l1_lambda": 0,
-        "weight_decay": 5e-3,
-        "policy_weight": 4.0,
+        "weight_decay": 1e-5,
+        "value_weight": 50.0,
+        "policy_weight": 1.0,
+        "persist_optimizer": True,  # if False, reinitialize the optimizer every train() call
     }
 
     def __init__(self, grid_size = 6, random_seed = None, training_params = {}, device = None):
@@ -130,6 +132,7 @@ class ZoningGamePolicyValueNet(TorchPolicyValueNet):
 
         self.DEVICE = (torch.accelerator.current_accelerator().type if torch.accelerator.is_available() else "cpu") if device is None else device
         print(f"Neural network training will occur on device '{self.DEVICE}'")
+        self.optimizer = None
 
     def _reshape_data(self, examples):
         # The usual case is that `examples` comes from AlphaZero and is a list of tuples
@@ -146,12 +149,17 @@ class ZoningGamePolicyValueNet(TorchPolicyValueNet):
         model = self.model
         model.to(self.DEVICE)
         tp = self.training_params
+
+        if self.optimizer is None or not tp["persist_optimizer"]:
+            print("Initializing optimizer")
+            self.optimizer = torch.optim.Adam(model.parameters(), lr=tp["learning_rate"], weight_decay=tp["weight_decay"])
+
+        value_weight = tp["value_weight"]
         policy_weight = tp["policy_weight"]
         l1_lambda = tp["l1_lambda"]
 
         criterion_value = nn.MSELoss()
         criterion_policy = nn.CrossEntropyLoss()
-        optimizer = torch.optim.Adam(model.parameters(), lr=tp["learning_rate"], weight_decay=tp["weight_decay"])
         dataset = self._reshape_data(examples) if needs_reshape else examples
         if val_dataset is not None and needs_reshape:
             val_dataset = self._reshape_data(val_dataset)
@@ -172,41 +180,45 @@ class ZoningGamePolicyValueNet(TorchPolicyValueNet):
             # Training phase
             model.train()
             train_loss = 0.0
+            policy_loss = 0.0
+            value_loss = 0.0
             train_mean_max = 0.0
             for inputs, targets_policy, targets_value in train_loader:
                 inputs, targets_value, targets_policy = inputs.to(self.DEVICE), targets_value.to(self.DEVICE), targets_policy.to(self.DEVICE)
-                optimizer.zero_grad()
+                self.optimizer.zero_grad()
                 outputs_policy, outputs_value = model(inputs)
                 loss_value = criterion_value(outputs_value.squeeze(), targets_value)
                 mean_max = outputs_policy.softmax(dim=-1).max(dim=-1).values.mean()
                 loss_policy = criterion_policy(outputs_policy.squeeze(), targets_policy)
-                loss = loss_value + policy_weight*loss_policy
+                loss = value_weight*loss_value + policy_weight*loss_policy
 
                 # Add L1 regularization
                 l1_norm = sum(p.abs().sum() for p in model.parameters())
                 loss += l1_lambda * l1_norm
 
                 loss.backward()
-                optimizer.step()
+                self.optimizer.step()
                 loss = loss.item()
                 train_mini_losses.append(loss)
                 train_loss += loss
+                policy_loss += loss_policy
+                value_loss += loss_value
                 train_mean_max += mean_max
 
             train_losses.append(train_loss / len(train_loader))
             train_mean_maxes.append(train_mean_max / len(train_loader))
 
+            epoch_msg = f"Epoch {epoch+1}/{tp['epochs']}, Train Loss: {train_losses[-1]:.4f} (value: {value_loss / len(train_loader):.4f}, weighted value: {value_weight * (value_loss / len(train_loader)):.4f}, policy: {policy_loss / len(train_loader):.4f}, weighted policy: {policy_weight * (policy_loss / len(train_loader)):.4f}), Train Mean Max: {train_mean_maxes[-1]:.4f}"
             # Validation phase
             if val_dataset is not None:
                 val_loss, val_mean_max = self.validate_inner(val_loader)
                 val_losses.append(val_loss)
                 
                 if print_all_epochs or epoch == 0 or epoch == tp["epochs"] - 1:
-                    print(f"Epoch {epoch+1}/{tp['epochs']}, Train Loss: {train_losses[-1]:.4f}, Train Mean Max: {train_mean_maxes[-1]:.4f}, Val Loss: {val_loss:.4f}, Val Mean Max: {val_mean_max:.4f}")
+                    print(f"{epoch_msg}, Val Loss: {val_loss:.4f}, Val Mean Max: {val_mean_max:.4f}")
             else:
                 if print_all_epochs or epoch == 0 or epoch == tp["epochs"] - 1:
-                    print(f"Epoch {epoch+1}/{tp['epochs']}, Train Loss: {train_losses[-1]:.4f}, Train Mean Max: {train_mean_maxes[-1]:.4f}")
-
+                    print(epoch_msg)
         return model, train_mini_losses, train_losses
 
     def validate_inner(self, val_loader):
@@ -249,3 +261,13 @@ class ZoningGamePolicyValueNet(TorchPolicyValueNet):
             policy, value = self.model(nn_input)
             policy_prob = F.softmax(policy, dim=-1)
         return policy_prob.numpy().squeeze(), value.numpy().squeeze()
+    
+    def push_multiprocessing(self):
+        super().push_multiprocessing()
+        optimizer = self.optimizer  # the optimizer can't be sent to CPU, so we'll stash it in caller state so we don't try to copy it
+        self.optimizer = None
+        return optimizer
+
+    def pop_multiprocessing(self, optimizer):
+        super().pop_multiprocessing(optimizer)
+        self.optimizer = optimizer

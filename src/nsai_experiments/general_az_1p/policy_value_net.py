@@ -41,6 +41,25 @@ class PolicyValueNet(ABC):
         saved the model.
         """
         pass
+    
+    @abstractmethod
+    def push_multiprocessing(self):
+        """
+        Prepares the instance for Python multiprocessing. This may involve moving tensors
+        from GPU to CPU so they can be automatically copied, etc. Anything that needs to be
+        erased from the instance before it is safe for multiprocessing can be returned; the
+        caller should then restore these values by calling `pop_multiprocessing` with them.
+        """
+        pass
+
+    @abstractmethod
+    def pop_multiprocessing(self, *args):
+        """
+        Restores the instance after a call to `push_multiprocessing`. This may involve
+        restoring from the arguments state that was erased and returned in
+        `push_multiprocessing`.
+        """
+        pass
 
 class TorchPolicyValueNet(PolicyValueNet):
     """
@@ -49,6 +68,9 @@ class TorchPolicyValueNet(PolicyValueNet):
     `load_checkpoint` methods that save and load this `model`. Users still need to implement
     `train` and `predict` methods to define their own training logic and any transformations
     that may need to happen before or after calling `model.forward()`, respectively.
+    Functional defaults for `push_multiprocessing` and `pop_multiprocessing` are provided,
+    but the user will need to override these if they have state beyond `model` that should
+    not be copied across processes (e.g., an optimizer).
     """
 
     model: nn.Module
@@ -69,3 +91,9 @@ class TorchPolicyValueNet(PolicyValueNet):
         if not save_file.exists():
             raise FileNotFoundError(f"Checkpoint file {save_file} does not exist.")
         self.model.load_state_dict(torch.load(save_file))
+
+    def push_multiprocessing(self):
+        self.model.cpu()
+    
+    def pop_multiprocessing(self, *args):
+        pass

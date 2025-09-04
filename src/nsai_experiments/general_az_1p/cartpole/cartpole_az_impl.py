@@ -41,10 +41,10 @@ class CumulativeRewardWrapper(gym.Wrapper):
 class CartPoleGame(EnvGame):
     _ACTION_MASK = np.array([True, True])  # Both actions are always available
 
-    def __init__(self, use_cumulative_reward_rescale=True, **kwargs):
+    def __init__(self, use_cumulative_reward_rescale=True, max_steps=100, **kwargs):
         env = gym.make("CartPole-v1", **kwargs)
         if use_cumulative_reward_rescale:
-            env = CumulativeRewardWrapper(env)
+            env = CumulativeRewardWrapper(env, max_steps=max_steps)
         super().__init__(env)
     
     def get_action_mask(self):
@@ -90,7 +90,7 @@ class CartPolePolicyValueNet(TorchPolicyValueNet):
         print(f"Neural network training will occur on device '{self.DEVICE}'")
 
         
-    def train(self, examples, needs_reshape=True):
+    def train(self, examples, needs_reshape=True, print_all_epochs=False):
         model = self.model
         model.to(self.DEVICE)
         tp = self.training_params
@@ -150,7 +150,7 @@ class CartPolePolicyValueNet(TorchPolicyValueNet):
                 value_loss += loss_value
 
             train_losses.append(train_loss / len(train_loader))
-            if epoch == 0 or epoch == tp["epochs"] - 1:
+            if print_all_epochs or epoch == 0 or epoch == tp["epochs"] - 1:
             # if True:
                 print(f"Epoch {epoch+1}/{tp['epochs']}, Train Loss: {train_losses[-1]:.4f} (value: {value_loss / len(train_loader):.4f}, policy: {policy_loss / len(train_loader):.4f}, weighted policy: {policy_weight * (policy_loss / len(train_loader)):.4f})")
 
