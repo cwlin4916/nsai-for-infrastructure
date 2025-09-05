@@ -22,8 +22,12 @@ class ScaleRewardWrapper(gym.RewardWrapper):
         return reward * self.scale
 
 class ZoningGameGame(EnvGame):
+    default_env_kwargs = {
+        "populate_info": False,
+    }
     def __init__(self, rescale_rewards = True, *args, **kwargs):
-        env = ZoningGameEnv(*args, **kwargs)
+        env_kwargs = self.default_env_kwargs | kwargs
+        env = ZoningGameEnv(*args, **env_kwargs)
         if rescale_rewards:
             divisor = env.grid_size*env.grid_size*3  # TODO tune empirically
             env = ScaleRewardWrapper(env, 1/divisor)

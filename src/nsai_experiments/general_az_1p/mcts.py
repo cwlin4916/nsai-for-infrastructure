@@ -74,11 +74,11 @@ class MCTS():
                 assert mystate == self.game.hashable_obs
             
             mynode = self.nodes[mystate]
-            counts = [mynode.action_N.get(a, 0) for a in range(len(mynode.nn_policy))]  # dictionary lookup misses in the case of action masked
+            counts = np.array([mynode.action_N.get(a, 0) for a in range(len(mynode.nn_policy))])  # dictionary lookup misses in the case of action masked
         
         if msg: print(msg, "mynode", mynode, "counts", counts)
-        if self.n_simulations >= 0: counts = np.array(counts) ** (1./self.temperature)
-        probs = counts / sum(counts)
+        counts = counts ** (1./self.temperature)
+        probs = counts / counts.sum()
         return probs
         
     def search(self, msg) -> float:
@@ -112,7 +112,7 @@ class MCTS():
             return myvalue
         
         # Recursive case: select the best action using UCB with action masking and descend the tree
-        ucbs = [self.masked_ucb(mynode, action, entab(msg, " ucb")) for action in range(len(mynode.nn_policy))]
+        ucbs = self.calc_masked_ucbs(mynode, entab(msg, " ucb"))
         best_action: int = np.argmax(ucbs)  # type: ignore
         if msg: print(msg, "-> taking action", best_action, "based on UCBs", ucbs)
         self.game.step_wrapper(best_action)
@@ -139,7 +139,8 @@ class MCTS():
         mypolicy, myvalue = self.query_net(msg)
 
         myaction_mask = self.game.get_action_mask()
-        if sum(myaction_mask) == 0:
+        sum_mask = myaction_mask.sum()
+        if sum_mask == 0:
             raise ValueError("Action mask says no valid moves")
         mypolicy *= myaction_mask
         sum_policy = mypolicy.sum()
@@ -147,26 +148,27 @@ class MCTS():
             mypolicy /= sum_policy
         else:
             warnings.warn("All valid moves have zero probability, ignoring probabilities")
-            mypolicy += myaction_mask / sum(myaction_mask)
+            mypolicy += myaction_mask / sum_mask
 
         return mypolicy, myvalue, myaction_mask
+    
+    def calc_masked_ucbs(self, mynode: MCTSTreeNode, msg) -> list[float]:
+        indices_to_calculate, = np.nonzero(mynode.action_mask)
 
-    # TODO if we decide to keep MCTSTreeNode, maybe some of these should be methods of that class
-    def calc_ucb(self, mynode: MCTSTreeNode, action: int, msg) -> float:
-        assert mynode.total_N == sum(mynode.action_N.values())
-        myaction_Q = mynode.action_Q.get(action, 0.0)
-        myaction_N = mynode.action_N.get(action, 0)
-        if len(msg) > 0: print(msg, "calc_ucb for action", action, "action Q", myaction_Q, "c_exploration", self.c_exploration, "nn policy", mynode.nn_policy[action], "total N", mynode.total_N, "action N", myaction_N)
-        result = myaction_Q + self.c_exploration * mynode.nn_policy[action] * \
-            np.sqrt(mynode.total_N + EPS) / (1 + myaction_N)
-        if len(msg) > 0: print(msg, "ucb result", result)
-        return result
-    
-    def masked_ucb(self, mynode: MCTSTreeNode, action: int, msg) -> float:
-        if not mynode.action_mask[action]:
-            return -np.inf
-        return self.calc_ucb(mynode, action, msg)
-    
+        qs = np.fromiter((mynode.action_Q.get(action, 0.0) for action in indices_to_calculate), dtype=float, count=len(indices_to_calculate))
+        ns = np.fromiter((mynode.action_N.get(action, 0) for action in indices_to_calculate), dtype=int, count=len(indices_to_calculate))
+
+        ucbs = qs + self.c_exploration * mynode.nn_policy[indices_to_calculate] * np.sqrt(mynode.total_N + EPS) / (1 + ns)
+
+        all_ucbs = np.full(mynode.nn_policy.shape, -np.inf)
+        all_ucbs[indices_to_calculate] = ucbs
+
+        if msg:
+            for i, action in enumerate(indices_to_calculate):
+                print(msg, "calc_ucb for action", action, "action Q", qs[i], "c_exploration", self.c_exploration, "nn policy", mynode.nn_policy[action], "total N", mynode.total_N, "action N", ns[i])
+                print(msg, "ucb result", ucbs[i])
+        return all_ucbs
+
     def update_edge(self, mynode: MCTSTreeNode, action: int, reward: float):
         if action not in mynode.action_N:
             assert action not in mynode.action_Q

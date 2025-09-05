@@ -59,7 +59,11 @@ def neighbor_score(padded_grid, my_row, my_col, neighbor_spec):
     score = 0
     neighbors = orthogonal_neighbors(padded_grid, my_row, my_col)
     for key, weight in neighbor_spec:
-        score += weight * sum(neighbors == key.value)
+        score += weight * (neighbors == key.value).sum()
+        # TODO the following ended up being slower so it's not urgent to figure this out,
+        # but as far as I can tell these should be completely equivalent and yet they're
+        # very subtly not -- why?
+        # score += weight * np.count_nonzero(neighbors == key.value)
     return score
 
 def calc_distance_to_coords(from_row, from_col, to_row, to_col):
@@ -167,7 +171,7 @@ class ZoningGameEnv(gym.Env):
 
     def __init__(self,
                  grid_size = 6, initially_filled_frac = 0.4, occurrences = DEFAULT_OCCURRENCES,
-                 render_mode = "ansi", max_moves = 100):
+                 render_mode = "ansi", max_moves = 100, populate_info = True):
         """
         Arguments (all have sensible defaults):
           `grid_size = 6`: side length of the square grid
@@ -184,6 +188,7 @@ class ZoningGameEnv(gym.Env):
         if max_moves < total_grid_cells:
             logger.warning(f"max_moves={max_moves} is less than total number of cells, {total_grid_cells}")
         self.max_moves = max_moves
+        self.populate_info = populate_info
 
         self.tile_grid, self.tile_queue, self.n_moves = None, None, None
         grid_space = spaces.MultiDiscrete([[len(Tile)]*self.grid_size]*self.grid_size)  # Grid is 2d space where each element has len(Tile) options
@@ -212,7 +217,7 @@ class ZoningGameEnv(gym.Env):
     
     def _get_info(self, average_scores = False):
         info = {}
-        if average_scores:
+        if self.populate_info and average_scores:
             info.update(self._get_average_scores())
         return info
 
