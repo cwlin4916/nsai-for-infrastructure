@@ -1,0 +1,418 @@
+(.venv) gkonars@gkonars-38684s nsai_experiments % python -m nsai_experiments.general_az_1p.zoning_game.zgaz_demo
+Neural network training will occur on device 'mps'
+RNG seeds are fully specified
+
+Training iteration 1 of 20: will play 3000 games, train, and evaluate on 300 games
+..games done in 290.19 seconds
+Training examples lengths: [64795]
+Training on 64795 examples
+Initializing optimizer
+Training with 32 batches of size 2048
+Epoch 1/10, Train Loss: 5.9132 (value: 0.0466, weighted value: 2.3306, policy: 3.5827, weighted policy: 3.5827), Train Mean Max: 0.0300
+Epoch 2/10, Train Loss: 4.3972 (value: 0.0163, weighted value: 0.8166, policy: 3.5806, weighted policy: 3.5806), Train Mean Max: 0.0302
+Epoch 3/10, Train Loss: 4.1027 (value: 0.0105, weighted value: 0.5240, policy: 3.5786, weighted policy: 3.5786), Train Mean Max: 0.0305
+Epoch 4/10, Train Loss: 4.0142 (value: 0.0088, weighted value: 0.4391, policy: 3.5751, weighted policy: 3.5751), Train Mean Max: 0.0305
+Epoch 5/10, Train Loss: 3.9687 (value: 0.0080, weighted value: 0.3991, policy: 3.5696, weighted policy: 3.5696), Train Mean Max: 0.0310
+Epoch 6/10, Train Loss: 3.8853 (value: 0.0065, weighted value: 0.3235, policy: 3.5618, weighted policy: 3.5618), Train Mean Max: 0.0310
+Epoch 7/10, Train Loss: 3.8086 (value: 0.0053, weighted value: 0.2635, policy: 3.5451, weighted policy: 3.5451), Train Mean Max: 0.0326
+Epoch 8/10, Train Loss: 3.8264 (value: 0.0062, weighted value: 0.3113, policy: 3.5151, weighted policy: 3.5151), Train Mean Max: 0.0353
+Epoch 9/10, Train Loss: 3.6844 (value: 0.0044, weighted value: 0.2196, policy: 3.4648, weighted policy: 3.4648), Train Mean Max: 0.0423
+Epoch 10/10, Train Loss: 3.5597 (value: 0.0035, weighted value: 0.1737, policy: 3.3860, weighted policy: 3.3860), Train Mean Max: 0.0565
+..training done in 17.93 seconds
+..evaluation done in 73.75 seconds
+Old network+MCTS average reward: 0.31, min: -0.20, max: 0.99, stdev: 0.21
+New network+MCTS average reward: 0.40, min: -0.33, max: 1.13, stdev: 0.23
+Old bare network average reward: 0.26, min: -0.34, max: 0.98, stdev: 0.22
+New bare network average reward: 0.26, min: -0.45, max: 0.98, stdev: 0.23
+New network won 224 and tied 5 out of 300 games (75.50% wins where ties are half wins)
+Keeping the new network
+
+Training iteration 2 of 20: will play 3000 games, train, and evaluate on 300 games
+..games done in 353.32 seconds
+Training examples lengths: [64795, 65039]
+Training on 129834 examples
+Training with 64 batches of size 2048
+Epoch 1/10, Train Loss: 3.8736 (value: 0.0133, weighted value: 0.6637, policy: 3.2100, weighted policy: 3.2100), Train Mean Max: 0.0752
+Epoch 2/10, Train Loss: 3.3578 (value: 0.0089, weighted value: 0.4442, policy: 2.9136, weighted policy: 2.9136), Train Mean Max: 0.1461
+Epoch 3/10, Train Loss: 3.1228 (value: 0.0084, weighted value: 0.4186, policy: 2.7042, weighted policy: 2.7042), Train Mean Max: 0.2009
+Epoch 4/10, Train Loss: 2.9379 (value: 0.0074, weighted value: 0.3696, policy: 2.5683, weighted policy: 2.5683), Train Mean Max: 0.2380
+Epoch 5/10, Train Loss: 2.7753 (value: 0.0061, weighted value: 0.3035, policy: 2.4718, weighted policy: 2.4718), Train Mean Max: 0.2611
+Epoch 6/10, Train Loss: 2.6602 (value: 0.0055, weighted value: 0.2740, policy: 2.3862, weighted policy: 2.3862), Train Mean Max: 0.2743
+Epoch 7/10, Train Loss: 2.6077 (value: 0.0057, weighted value: 0.2837, policy: 2.3240, weighted policy: 2.3240), Train Mean Max: 0.2774
+Epoch 8/10, Train Loss: 2.4935 (value: 0.0046, weighted value: 0.2300, policy: 2.2635, weighted policy: 2.2635), Train Mean Max: 0.2849
+Epoch 9/10, Train Loss: 2.4513 (value: 0.0047, weighted value: 0.2335, policy: 2.2179, weighted policy: 2.2179), Train Mean Max: 0.2824
+Epoch 10/10, Train Loss: 2.3890 (value: 0.0042, weighted value: 0.2093, policy: 2.1796, weighted policy: 2.1796), Train Mean Max: 0.2828
+..training done in 24.47 seconds
+..evaluation done in 79.90 seconds
+Old network+MCTS average reward: 0.40, min: -0.27, max: 1.16, stdev: 0.21
+New network+MCTS average reward: 0.46, min: -0.15, max: 1.27, stdev: 0.23
+Old bare network average reward: 0.28, min: -0.25, max: 0.99, stdev: 0.21
+New bare network average reward: 0.28, min: -0.21, max: 1.02, stdev: 0.21
+New network won 188 and tied 14 out of 300 games (65.00% wins where ties are half wins)
+Keeping the new network
+
+Training iteration 3 of 20: will play 3000 games, train, and evaluate on 300 games
+..games done in 359.29 seconds
+Training examples lengths: [64795, 65039, 64860]
+Training on 194694 examples
+Training with 96 batches of size 2048
+Epoch 1/10, Train Loss: 2.4024 (value: 0.0084, weighted value: 0.4181, policy: 1.9843, weighted policy: 1.9843), Train Mean Max: 0.3117
+Epoch 2/10, Train Loss: 2.3069 (value: 0.0068, weighted value: 0.3409, policy: 1.9660, weighted policy: 1.9660), Train Mean Max: 0.3311
+Epoch 3/10, Train Loss: 2.2504 (value: 0.0060, weighted value: 0.2978, policy: 1.9526, weighted policy: 1.9526), Train Mean Max: 0.3376
+Epoch 4/10, Train Loss: 2.2254 (value: 0.0056, weighted value: 0.2811, policy: 1.9442, weighted policy: 1.9442), Train Mean Max: 0.3408
+Epoch 5/10, Train Loss: 2.1832 (value: 0.0050, weighted value: 0.2475, policy: 1.9356, weighted policy: 1.9356), Train Mean Max: 0.3430
+Epoch 6/10, Train Loss: 2.1667 (value: 0.0047, weighted value: 0.2374, policy: 1.9293, weighted policy: 1.9293), Train Mean Max: 0.3453
+Epoch 7/10, Train Loss: 2.1438 (value: 0.0044, weighted value: 0.2200, policy: 1.9238, weighted policy: 1.9238), Train Mean Max: 0.3473
+Epoch 8/10, Train Loss: 2.1219 (value: 0.0041, weighted value: 0.2038, policy: 1.9181, weighted policy: 1.9181), Train Mean Max: 0.3492
+Epoch 9/10, Train Loss: 2.1027 (value: 0.0038, weighted value: 0.1900, policy: 1.9127, weighted policy: 1.9127), Train Mean Max: 0.3508
+Epoch 10/10, Train Loss: 2.0843 (value: 0.0035, weighted value: 0.1754, policy: 1.9089, weighted policy: 1.9089), Train Mean Max: 0.3523
+..training done in 34.99 seconds
+..evaluation done in 80.45 seconds
+Old network+MCTS average reward: 0.44, min: -0.14, max: 1.00, stdev: 0.23
+New network+MCTS average reward: 0.45, min: -0.17, max: 1.01, stdev: 0.22
+Old bare network average reward: 0.26, min: -0.26, max: 1.03, stdev: 0.23
+New bare network average reward: 0.27, min: -0.27, max: 1.00, stdev: 0.22
+New network won 155 and tied 10 out of 300 games (53.33% wins where ties are half wins)
+Keeping the new network
+
+Training iteration 4 of 20: will play 3000 games, train, and evaluate on 300 games
+..games done in 371.50 seconds
+Training examples lengths: [64795, 65039, 64860, 64704]
+Training on 259398 examples
+Training with 127 batches of size 2048
+Epoch 1/10, Train Loss: 2.1282 (value: 0.0068, weighted value: 0.3416, policy: 1.7866, weighted policy: 1.7866), Train Mean Max: 0.3775
+Epoch 2/10, Train Loss: 2.0442 (value: 0.0054, weighted value: 0.2692, policy: 1.7750, weighted policy: 1.7750), Train Mean Max: 0.3897
+Epoch 3/10, Train Loss: 2.0203 (value: 0.0050, weighted value: 0.2510, policy: 1.7693, weighted policy: 1.7693), Train Mean Max: 0.3936
+Epoch 4/10, Train Loss: 1.9968 (value: 0.0047, weighted value: 0.2329, policy: 1.7638, weighted policy: 1.7638), Train Mean Max: 0.3956
+Epoch 5/10, Train Loss: 1.9831 (value: 0.0044, weighted value: 0.2218, policy: 1.7613, weighted policy: 1.7613), Train Mean Max: 0.3981
+Epoch 6/10, Train Loss: 1.9560 (value: 0.0040, weighted value: 0.1993, policy: 1.7568, weighted policy: 1.7568), Train Mean Max: 0.4000
+Epoch 7/10, Train Loss: 1.9385 (value: 0.0037, weighted value: 0.1836, policy: 1.7549, weighted policy: 1.7549), Train Mean Max: 0.4021
+Epoch 8/10, Train Loss: 1.9343 (value: 0.0036, weighted value: 0.1815, policy: 1.7528, weighted policy: 1.7528), Train Mean Max: 0.4029
+Epoch 9/10, Train Loss: 1.9199 (value: 0.0034, weighted value: 0.1691, policy: 1.7508, weighted policy: 1.7508), Train Mean Max: 0.4041
+Epoch 10/10, Train Loss: 1.9096 (value: 0.0032, weighted value: 0.1617, policy: 1.7479, weighted policy: 1.7479), Train Mean Max: 0.4054
+..training done in 48.38 seconds
+..evaluation done in 79.64 seconds
+Old network+MCTS average reward: 0.46, min: -0.31, max: 1.08, stdev: 0.24
+New network+MCTS average reward: 0.46, min: -0.19, max: 1.31, stdev: 0.24
+Old bare network average reward: 0.26, min: -0.35, max: 1.01, stdev: 0.25
+New bare network average reward: 0.28, min: -0.38, max: 0.94, stdev: 0.24
+New network won 144 and tied 7 out of 300 games (49.17% wins where ties are half wins)
+Reverting to the old network
+
+Training iteration 5 of 20: will play 3000 games, train, and evaluate on 300 games
+..games done in 363.23 seconds
+Training examples lengths: [64795, 65039, 64860, 64704, 64923]
+Training on 324321 examples
+Initializing optimizer
+Training with 159 batches of size 2048
+Epoch 1/10, Train Loss: 3.4207 (value: 0.0268, weighted value: 1.3409, policy: 2.0798, weighted policy: 2.0798), Train Mean Max: 0.3192
+Epoch 2/10, Train Loss: 2.1902 (value: 0.0094, weighted value: 0.4711, policy: 1.7191, weighted policy: 1.7191), Train Mean Max: 0.3943
+Epoch 3/10, Train Loss: 2.1118 (value: 0.0083, weighted value: 0.4154, policy: 1.6964, weighted policy: 1.6964), Train Mean Max: 0.4089
+Epoch 4/10, Train Loss: 2.0636 (value: 0.0075, weighted value: 0.3751, policy: 1.6885, weighted policy: 1.6885), Train Mean Max: 0.4146
+Epoch 5/10, Train Loss: 2.0152 (value: 0.0066, weighted value: 0.3315, policy: 1.6837, weighted policy: 1.6837), Train Mean Max: 0.4185
+Epoch 6/10, Train Loss: 1.9798 (value: 0.0060, weighted value: 0.3015, policy: 1.6783, weighted policy: 1.6783), Train Mean Max: 0.4218
+Epoch 7/10, Train Loss: 1.9410 (value: 0.0053, weighted value: 0.2667, policy: 1.6742, weighted policy: 1.6742), Train Mean Max: 0.4249
+Epoch 8/10, Train Loss: 1.9299 (value: 0.0051, weighted value: 0.2572, policy: 1.6727, weighted policy: 1.6727), Train Mean Max: 0.4262
+Epoch 9/10, Train Loss: 1.8964 (value: 0.0046, weighted value: 0.2286, policy: 1.6677, weighted policy: 1.6677), Train Mean Max: 0.4283
+Epoch 10/10, Train Loss: 1.8618 (value: 0.0040, weighted value: 0.1987, policy: 1.6630, weighted policy: 1.6630), Train Mean Max: 0.4311
+..training done in 57.50 seconds
+..evaluation done in 79.14 seconds
+Old network+MCTS average reward: 0.50, min: -0.19, max: 1.14, stdev: 0.24
+New network+MCTS average reward: 0.52, min: -0.24, max: 1.23, stdev: 0.24
+Old bare network average reward: 0.30, min: -0.42, max: 1.05, stdev: 0.24
+New bare network average reward: 0.32, min: -0.38, max: 0.94, stdev: 0.24
+New network won 165 and tied 14 out of 300 games (57.33% wins where ties are half wins)
+Keeping the new network
+
+Training iteration 6 of 20: will play 3000 games, train, and evaluate on 300 games
+..games done in 383.54 seconds
+Training examples lengths: [64795, 65039, 64860, 64704, 64923, 64703]
+Training on 389024 examples
+Training with 190 batches of size 2048
+Epoch 1/10, Train Loss: 1.8574 (value: 0.0054, weighted value: 0.2691, policy: 1.5882, weighted policy: 1.5882), Train Mean Max: 0.4470
+Epoch 2/10, Train Loss: 1.8138 (value: 0.0046, weighted value: 0.2289, policy: 1.5849, weighted policy: 1.5849), Train Mean Max: 0.4540
+Epoch 3/10, Train Loss: 1.8408 (value: 0.0050, weighted value: 0.2524, policy: 1.5884, weighted policy: 1.5884), Train Mean Max: 0.4545
+Epoch 4/10, Train Loss: 1.7945 (value: 0.0042, weighted value: 0.2112, policy: 1.5833, weighted policy: 1.5833), Train Mean Max: 0.4578
+Epoch 5/10, Train Loss: 1.8022 (value: 0.0044, weighted value: 0.2190, policy: 1.5832, weighted policy: 1.5832), Train Mean Max: 0.4579
+Epoch 6/10, Train Loss: 1.7469 (value: 0.0034, weighted value: 0.1716, policy: 1.5753, weighted policy: 1.5753), Train Mean Max: 0.4616
+Epoch 7/10, Train Loss: 1.7394 (value: 0.0033, weighted value: 0.1659, policy: 1.5735, weighted policy: 1.5735), Train Mean Max: 0.4620
+Epoch 8/10, Train Loss: 1.7218 (value: 0.0030, weighted value: 0.1501, policy: 1.5718, weighted policy: 1.5718), Train Mean Max: 0.4636
+Epoch 9/10, Train Loss: 1.7153 (value: 0.0029, weighted value: 0.1461, policy: 1.5691, weighted policy: 1.5691), Train Mean Max: 0.4640
+Epoch 10/10, Train Loss: 1.7064 (value: 0.0028, weighted value: 0.1385, policy: 1.5679, weighted policy: 1.5679), Train Mean Max: 0.4652
+..training done in 62.60 seconds
+..evaluation done in 82.29 seconds
+Old network+MCTS average reward: 0.51, min: -0.22, max: 1.24, stdev: 0.24
+New network+MCTS average reward: 0.52, min: -0.19, max: 1.16, stdev: 0.25
+Old bare network average reward: 0.31, min: -0.39, max: 0.98, stdev: 0.24
+New bare network average reward: 0.32, min: -0.39, max: 1.01, stdev: 0.24
+New network won 160 and tied 11 out of 300 games (55.17% wins where ties are half wins)
+Keeping the new network
+
+Training iteration 7 of 20: will play 3000 games, train, and evaluate on 300 games
+..games done in 387.48 seconds
+Training examples lengths: [64795, 65039, 64860, 64704, 64923, 64703, 64600]
+Training on 453624 examples
+Training with 222 batches of size 2048
+Epoch 1/10, Train Loss: 1.7169 (value: 0.0042, weighted value: 0.2099, policy: 1.5070, weighted policy: 1.5070), Train Mean Max: 0.4779
+Epoch 2/10, Train Loss: 1.6817 (value: 0.0036, weighted value: 0.1779, policy: 1.5038, weighted policy: 1.5038), Train Mean Max: 0.4832
+Epoch 3/10, Train Loss: 1.6645 (value: 0.0032, weighted value: 0.1623, policy: 1.5023, weighted policy: 1.5023), Train Mean Max: 0.4850
+Epoch 4/10, Train Loss: 1.6610 (value: 0.0032, weighted value: 0.1600, policy: 1.5010, weighted policy: 1.5010), Train Mean Max: 0.4855
+Epoch 5/10, Train Loss: 1.6426 (value: 0.0029, weighted value: 0.1442, policy: 1.4983, weighted policy: 1.4983), Train Mean Max: 0.4872
+Epoch 6/10, Train Loss: 1.6339 (value: 0.0027, weighted value: 0.1374, policy: 1.4965, weighted policy: 1.4965), Train Mean Max: 0.4879
+Epoch 7/10, Train Loss: 1.6246 (value: 0.0026, weighted value: 0.1302, policy: 1.4944, weighted policy: 1.4944), Train Mean Max: 0.4889
+Epoch 8/10, Train Loss: 1.6161 (value: 0.0024, weighted value: 0.1221, policy: 1.4940, weighted policy: 1.4940), Train Mean Max: 0.4895
+Epoch 9/10, Train Loss: 1.6168 (value: 0.0025, weighted value: 0.1260, policy: 1.4908, weighted policy: 1.4908), Train Mean Max: 0.4894
+Epoch 10/10, Train Loss: 1.6089 (value: 0.0024, weighted value: 0.1196, policy: 1.4893, weighted policy: 1.4893), Train Mean Max: 0.4902
+..training done in 72.02 seconds
+..evaluation done in 87.71 seconds
+Old network+MCTS average reward: 0.49, min: -0.15, max: 1.46, stdev: 0.24
+New network+MCTS average reward: 0.50, min: -0.24, max: 1.36, stdev: 0.24
+Old bare network average reward: 0.28, min: -0.29, max: 1.25, stdev: 0.24
+New bare network average reward: 0.29, min: -0.30, max: 1.29, stdev: 0.24
+New network won 145 and tied 16 out of 300 games (51.00% wins where ties are half wins)
+Keeping the new network
+
+Training iteration 8 of 20: will play 3000 games, train, and evaluate on 300 games
+..games done in 392.14 seconds
+Training examples lengths: [64795, 65039, 64860, 64704, 64923, 64703, 64600, 64654]
+Training on 518278 examples
+Training with 254 batches of size 2048
+Epoch 1/10, Train Loss: 1.6201 (value: 0.0036, weighted value: 0.1805, policy: 1.4396, weighted policy: 1.4396), Train Mean Max: 0.5015
+Epoch 2/10, Train Loss: 1.5982 (value: 0.0032, weighted value: 0.1589, policy: 1.4394, weighted policy: 1.4394), Train Mean Max: 0.5053
+Epoch 3/10, Train Loss: 1.5767 (value: 0.0028, weighted value: 0.1386, policy: 1.4381, weighted policy: 1.4381), Train Mean Max: 0.5073
+Epoch 4/10, Train Loss: 1.5742 (value: 0.0028, weighted value: 0.1380, policy: 1.4362, weighted policy: 1.4362), Train Mean Max: 0.5075
+Epoch 5/10, Train Loss: 1.5621 (value: 0.0026, weighted value: 0.1281, policy: 1.4340, weighted policy: 1.4340), Train Mean Max: 0.5083
+Epoch 6/10, Train Loss: 1.5544 (value: 0.0024, weighted value: 0.1209, policy: 1.4335, weighted policy: 1.4335), Train Mean Max: 0.5095
+Epoch 7/10, Train Loss: 1.5514 (value: 0.0024, weighted value: 0.1214, policy: 1.4300, weighted policy: 1.4300), Train Mean Max: 0.5091
+Epoch 8/10, Train Loss: 1.5452 (value: 0.0023, weighted value: 0.1165, policy: 1.4287, weighted policy: 1.4287), Train Mean Max: 0.5099
+Epoch 9/10, Train Loss: 1.5349 (value: 0.0021, weighted value: 0.1071, policy: 1.4278, weighted policy: 1.4278), Train Mean Max: 0.5107
+Epoch 10/10, Train Loss: 1.5364 (value: 0.0022, weighted value: 0.1094, policy: 1.4270, weighted policy: 1.4270), Train Mean Max: 0.5108
+..training done in 82.50 seconds
+..evaluation done in 83.92 seconds
+Old network+MCTS average reward: 0.50, min: -0.32, max: 1.19, stdev: 0.25
+New network+MCTS average reward: 0.52, min: -0.18, max: 1.29, stdev: 0.24
+Old bare network average reward: 0.30, min: -0.46, max: 1.04, stdev: 0.23
+New bare network average reward: 0.31, min: -0.46, max: 1.03, stdev: 0.24
+New network won 150 and tied 16 out of 300 games (52.67% wins where ties are half wins)
+Keeping the new network
+
+Training iteration 9 of 20: will play 3000 games, train, and evaluate on 300 games
+..games done in 389.76 seconds
+Training examples lengths: [64795, 65039, 64860, 64704, 64923, 64703, 64600, 64654, 65101]
+Training on 583379 examples
+Training with 285 batches of size 2048
+Epoch 1/10, Train Loss: 1.5432 (value: 0.0031, weighted value: 0.1572, policy: 1.3860, weighted policy: 1.3860), Train Mean Max: 0.5211
+Epoch 2/10, Train Loss: 1.5250 (value: 0.0029, weighted value: 0.1429, policy: 1.3821, weighted policy: 1.3821), Train Mean Max: 0.5232
+Epoch 3/10, Train Loss: 1.5121 (value: 0.0026, weighted value: 0.1310, policy: 1.3811, weighted policy: 1.3811), Train Mean Max: 0.5247
+Epoch 4/10, Train Loss: 1.5069 (value: 0.0025, weighted value: 0.1261, policy: 1.3808, weighted policy: 1.3808), Train Mean Max: 0.5251
+Epoch 5/10, Train Loss: 1.4904 (value: 0.0023, weighted value: 0.1129, policy: 1.3775, weighted policy: 1.3775), Train Mean Max: 0.5263
+Epoch 6/10, Train Loss: 1.4935 (value: 0.0023, weighted value: 0.1171, policy: 1.3765, weighted policy: 1.3765), Train Mean Max: 0.5263
+Epoch 7/10, Train Loss: 1.4836 (value: 0.0022, weighted value: 0.1088, policy: 1.3748, weighted policy: 1.3748), Train Mean Max: 0.5271
+Epoch 8/10, Train Loss: 1.4789 (value: 0.0021, weighted value: 0.1048, policy: 1.3740, weighted policy: 1.3740), Train Mean Max: 0.5275
+Epoch 9/10, Train Loss: 1.4776 (value: 0.0021, weighted value: 0.1046, policy: 1.3730, weighted policy: 1.3730), Train Mean Max: 0.5276
+Epoch 10/10, Train Loss: 1.4741 (value: 0.0020, weighted value: 0.1022, policy: 1.3719, weighted policy: 1.3719), Train Mean Max: 0.5279
+..training done in 97.23 seconds
+..evaluation done in 90.68 seconds
+Old network+MCTS average reward: 0.53, min: -0.10, max: 1.20, stdev: 0.24
+New network+MCTS average reward: 0.53, min: -0.15, max: 1.31, stdev: 0.24
+Old bare network average reward: 0.33, min: -0.20, max: 1.13, stdev: 0.23
+New bare network average reward: 0.33, min: -0.31, max: 1.09, stdev: 0.23
+New network won 139 and tied 12 out of 300 games (48.33% wins where ties are half wins)
+Reverting to the old network
+
+Training iteration 10 of 20: will play 3000 games, train, and evaluate on 300 games
+..games done in 399.55 seconds
+Training examples lengths: [64795, 65039, 64860, 64704, 64923, 64703, 64600, 64654, 65101, 64821]
+Training on 648200 examples
+Initializing optimizer
+Training with 317 batches of size 2048
+Epoch 1/10, Train Loss: 1.9339 (value: 0.0103, weighted value: 0.5139, policy: 1.4200, weighted policy: 1.4200), Train Mean Max: 0.5093
+Epoch 2/10, Train Loss: 1.5683 (value: 0.0043, weighted value: 0.2168, policy: 1.3516, weighted policy: 1.3516), Train Mean Max: 0.5310
+Epoch 3/10, Train Loss: 1.5223 (value: 0.0035, weighted value: 0.1762, policy: 1.3462, weighted policy: 1.3462), Train Mean Max: 0.5343
+Epoch 4/10, Train Loss: 1.4995 (value: 0.0031, weighted value: 0.1540, policy: 1.3455, weighted policy: 1.3455), Train Mean Max: 0.5357
+Epoch 5/10, Train Loss: 1.4870 (value: 0.0028, weighted value: 0.1423, policy: 1.3447, weighted policy: 1.3447), Train Mean Max: 0.5362
+Epoch 6/10, Train Loss: 1.4745 (value: 0.0026, weighted value: 0.1319, policy: 1.3426, weighted policy: 1.3426), Train Mean Max: 0.5369
+Epoch 7/10, Train Loss: 1.4727 (value: 0.0026, weighted value: 0.1308, policy: 1.3419, weighted policy: 1.3419), Train Mean Max: 0.5372
+Epoch 8/10, Train Loss: 1.4497 (value: 0.0022, weighted value: 0.1113, policy: 1.3383, weighted policy: 1.3383), Train Mean Max: 0.5386
+Epoch 9/10, Train Loss: 1.4458 (value: 0.0022, weighted value: 0.1092, policy: 1.3366, weighted policy: 1.3366), Train Mean Max: 0.5393
+Epoch 10/10, Train Loss: 1.4365 (value: 0.0021, weighted value: 0.1028, policy: 1.3337, weighted policy: 1.3337), Train Mean Max: 0.5404
+..training done in 107.52 seconds
+..evaluation done in 85.09 seconds
+Old network+MCTS average reward: 0.52, min: -0.19, max: 1.08, stdev: 0.22
+New network+MCTS average reward: 0.53, min: -0.11, max: 1.19, stdev: 0.22
+Old bare network average reward: 0.31, min: -0.53, max: 0.93, stdev: 0.24
+New bare network average reward: 0.32, min: -0.39, max: 0.90, stdev: 0.23
+New network won 145 and tied 19 out of 300 games (51.50% wins where ties are half wins)
+Keeping the new network
+
+Training iteration 11 of 20: will play 3000 games, train, and evaluate on 300 games
+..games done in 384.47 seconds
+Training examples lengths: [65039, 64860, 64704, 64923, 64703, 64600, 64654, 65101, 64821, 65024]
+Training on 648429 examples
+Training with 317 batches of size 2048
+Epoch 1/10, Train Loss: 1.3019 (value: 0.0029, weighted value: 0.1453, policy: 1.1565, weighted policy: 1.1565), Train Mean Max: 0.5853
+Epoch 2/10, Train Loss: 1.2675 (value: 0.0023, weighted value: 0.1174, policy: 1.1501, weighted policy: 1.1501), Train Mean Max: 0.5947
+Epoch 3/10, Train Loss: 1.2522 (value: 0.0021, weighted value: 0.1074, policy: 1.1448, weighted policy: 1.1448), Train Mean Max: 0.5974
+Epoch 4/10, Train Loss: 1.2407 (value: 0.0020, weighted value: 0.0978, policy: 1.1430, weighted policy: 1.1430), Train Mean Max: 0.5995
+Epoch 5/10, Train Loss: 1.2367 (value: 0.0019, weighted value: 0.0971, policy: 1.1395, weighted policy: 1.1395), Train Mean Max: 0.6000
+Epoch 6/10, Train Loss: 1.2263 (value: 0.0018, weighted value: 0.0895, policy: 1.1368, weighted policy: 1.1368), Train Mean Max: 0.6012
+Epoch 7/10, Train Loss: 1.2193 (value: 0.0017, weighted value: 0.0844, policy: 1.1349, weighted policy: 1.1349), Train Mean Max: 0.6019
+Epoch 8/10, Train Loss: 1.2133 (value: 0.0016, weighted value: 0.0799, policy: 1.1334, weighted policy: 1.1334), Train Mean Max: 0.6029
+Epoch 9/10, Train Loss: 1.2126 (value: 0.0017, weighted value: 0.0827, policy: 1.1299, weighted policy: 1.1299), Train Mean Max: 0.6029
+Epoch 10/10, Train Loss: 1.2083 (value: 0.0016, weighted value: 0.0787, policy: 1.1296, weighted policy: 1.1296), Train Mean Max: 0.6038
+..training done in 121.79 seconds
+..evaluation done in 81.04 seconds
+Old network+MCTS average reward: 0.53, min: -0.05, max: 1.09, stdev: 0.24
+New network+MCTS average reward: 0.56, min: -0.08, max: 1.11, stdev: 0.23
+Old bare network average reward: 0.32, min: -0.21, max: 1.08, stdev: 0.23
+New bare network average reward: 0.36, min: -0.28, max: 0.99, stdev: 0.22
+New network won 169 and tied 23 out of 300 games (60.17% wins where ties are half wins)
+Keeping the new network
+
+Training iteration 12 of 20: will play 3000 games, train, and evaluate on 300 games
+..games done in 393.96 seconds
+Training examples lengths: [64860, 64704, 64923, 64703, 64600, 64654, 65101, 64821, 65024, 64996]
+Training on 648386 examples
+Training with 317 batches of size 2048
+Epoch 1/10, Train Loss: 1.1637 (value: 0.0025, weighted value: 0.1237, policy: 1.0400, weighted policy: 1.0400), Train Mean Max: 0.6248
+Epoch 2/10, Train Loss: 1.1361 (value: 0.0020, weighted value: 0.1013, policy: 1.0348, weighted policy: 1.0348), Train Mean Max: 0.6311
+Epoch 3/10, Train Loss: 1.1249 (value: 0.0018, weighted value: 0.0920, policy: 1.0329, weighted policy: 1.0329), Train Mean Max: 0.6337
+Epoch 4/10, Train Loss: 1.1238 (value: 0.0019, weighted value: 0.0933, policy: 1.0305, weighted policy: 1.0305), Train Mean Max: 0.6343
+Epoch 5/10, Train Loss: 1.1037 (value: 0.0015, weighted value: 0.0757, policy: 1.0280, weighted policy: 1.0280), Train Mean Max: 0.6362
+Epoch 6/10, Train Loss: 1.1040 (value: 0.0016, weighted value: 0.0779, policy: 1.0261, weighted policy: 1.0261), Train Mean Max: 0.6365
+Epoch 7/10, Train Loss: 1.0997 (value: 0.0015, weighted value: 0.0750, policy: 1.0247, weighted policy: 1.0247), Train Mean Max: 0.6370
+Epoch 8/10, Train Loss: 1.1063 (value: 0.0016, weighted value: 0.0815, policy: 1.0248, weighted policy: 1.0248), Train Mean Max: 0.6369
+Epoch 9/10, Train Loss: 1.0958 (value: 0.0015, weighted value: 0.0733, policy: 1.0225, weighted policy: 1.0225), Train Mean Max: 0.6380
+Epoch 10/10, Train Loss: 1.0855 (value: 0.0013, weighted value: 0.0655, policy: 1.0200, weighted policy: 1.0200), Train Mean Max: 0.6389
+..training done in 109.48 seconds
+..evaluation done in 94.53 seconds
+Old network+MCTS average reward: 0.54, min: -0.09, max: 1.33, stdev: 0.23
+New network+MCTS average reward: 0.54, min: -0.17, max: 1.41, stdev: 0.23
+Old bare network average reward: 0.34, min: -0.35, max: 1.03, stdev: 0.25
+New bare network average reward: 0.35, min: -0.19, max: 1.16, stdev: 0.24
+New network won 139 and tied 18 out of 300 games (49.33% wins where ties are half wins)
+Reverting to the old network
+
+Training iteration 13 of 20: will play 3000 games, train, and evaluate on 300 games
+..games done in 411.09 seconds
+Training examples lengths: [64704, 64923, 64703, 64600, 64654, 65101, 64821, 65024, 64996, 64921]
+Training on 648447 examples
+Initializing optimizer
+Training with 317 batches of size 2048
+Epoch 1/10, Train Loss: 1.5820 (value: 0.0103, weighted value: 0.5126, policy: 1.0694, weighted policy: 1.0694), Train Mean Max: 0.6076
+Epoch 2/10, Train Loss: 1.1629 (value: 0.0036, weighted value: 0.1792, policy: 0.9837, weighted policy: 0.9837), Train Mean Max: 0.6409
+Epoch 3/10, Train Loss: 1.1193 (value: 0.0028, weighted value: 0.1408, policy: 0.9785, weighted policy: 0.9785), Train Mean Max: 0.6474
+Epoch 4/10, Train Loss: 1.0993 (value: 0.0024, weighted value: 0.1212, policy: 0.9781, weighted policy: 0.9781), Train Mean Max: 0.6506
+Epoch 5/10, Train Loss: 1.0843 (value: 0.0022, weighted value: 0.1104, policy: 0.9739, weighted policy: 0.9739), Train Mean Max: 0.6522
+Epoch 6/10, Train Loss: 1.0724 (value: 0.0020, weighted value: 0.1018, policy: 0.9706, weighted policy: 0.9706), Train Mean Max: 0.6532
+Epoch 7/10, Train Loss: 1.0665 (value: 0.0019, weighted value: 0.0962, policy: 0.9703, weighted policy: 0.9703), Train Mean Max: 0.6542
+Epoch 8/10, Train Loss: 1.0534 (value: 0.0017, weighted value: 0.0861, policy: 0.9673, weighted policy: 0.9673), Train Mean Max: 0.6550
+Epoch 9/10, Train Loss: 1.0457 (value: 0.0016, weighted value: 0.0816, policy: 0.9641, weighted policy: 0.9641), Train Mean Max: 0.6562
+Epoch 10/10, Train Loss: 1.0410 (value: 0.0016, weighted value: 0.0783, policy: 0.9627, weighted policy: 0.9627), Train Mean Max: 0.6568
+..training done in 110.81 seconds
+..evaluation done in 96.27 seconds
+Old network+MCTS average reward: 0.55, min: -0.16, max: 1.26, stdev: 0.23
+New network+MCTS average reward: 0.55, min: -0.07, max: 1.23, stdev: 0.23
+Old bare network average reward: 0.34, min: -0.37, max: 0.89, stdev: 0.23
+New bare network average reward: 0.36, min: -0.33, max: 1.02, stdev: 0.23
+New network won 145 and tied 21 out of 300 games (51.83% wins where ties are half wins)
+Keeping the new network
+
+Training iteration 14 of 20: will play 3000 games, train, and evaluate on 300 games
+..games done in 415.57 seconds
+Training examples lengths: [64923, 64703, 64600, 64654, 65101, 64821, 65024, 64996, 64921, 64566]
+Training on 648309 examples
+Training with 317 batches of size 2048
+Epoch 1/10, Train Loss: 1.0431 (value: 0.0024, weighted value: 0.1209, policy: 0.9223, weighted policy: 0.9223), Train Mean Max: 0.6647
+Epoch 2/10, Train Loss: 1.0050 (value: 0.0018, weighted value: 0.0888, policy: 0.9162, weighted policy: 0.9162), Train Mean Max: 0.6700
+Epoch 3/10, Train Loss: 1.0007 (value: 0.0017, weighted value: 0.0864, policy: 0.9143, weighted policy: 0.9143), Train Mean Max: 0.6712
+Epoch 4/10, Train Loss: 0.9861 (value: 0.0015, weighted value: 0.0747, policy: 0.9114, weighted policy: 0.9114), Train Mean Max: 0.6733
+Epoch 5/10, Train Loss: 0.9839 (value: 0.0015, weighted value: 0.0753, policy: 0.9086, weighted policy: 0.9086), Train Mean Max: 0.6738
+Epoch 6/10, Train Loss: 0.9784 (value: 0.0014, weighted value: 0.0715, policy: 0.9068, weighted policy: 0.9068), Train Mean Max: 0.6749
+Epoch 7/10, Train Loss: 0.9684 (value: 0.0013, weighted value: 0.0651, policy: 0.9033, weighted policy: 0.9033), Train Mean Max: 0.6760
+Epoch 8/10, Train Loss: 0.9697 (value: 0.0014, weighted value: 0.0679, policy: 0.9018, weighted policy: 0.9018), Train Mean Max: 0.6763
+Epoch 9/10, Train Loss: 0.9584 (value: 0.0012, weighted value: 0.0591, policy: 0.8993, weighted policy: 0.8993), Train Mean Max: 0.6776
+Epoch 10/10, Train Loss: 0.9596 (value: 0.0012, weighted value: 0.0620, policy: 0.8975, weighted policy: 0.8975), Train Mean Max: 0.6779
+..training done in 105.54 seconds
+..evaluation done in 83.25 seconds
+Old network+MCTS average reward: 0.54, min: -0.03, max: 1.19, stdev: 0.22
+New network+MCTS average reward: 0.54, min: -0.13, max: 1.15, stdev: 0.21
+Old bare network average reward: 0.35, min: -0.28, max: 0.96, stdev: 0.21
+New bare network average reward: 0.38, min: -0.33, max: 1.08, stdev: 0.22
+New network won 136 and tied 23 out of 300 games (49.17% wins where ties are half wins)
+Reverting to the old network
+
+Training iteration 15 of 20: will play 3000 games, train, and evaluate on 300 games
+..games done in 397.59 seconds
+Training examples lengths: [64703, 64600, 64654, 65101, 64821, 65024, 64996, 64921, 64566, 64747]
+Training on 648133 examples
+Initializing optimizer
+Training with 317 batches of size 2048
+Epoch 1/10, Train Loss: 1.2829 (value: 0.0072, weighted value: 0.3605, policy: 0.9225, weighted policy: 0.9225), Train Mean Max: 0.6580
+Epoch 2/10, Train Loss: 1.0246 (value: 0.0030, weighted value: 0.1499, policy: 0.8746, weighted policy: 0.8746), Train Mean Max: 0.6779
+Epoch 3/10, Train Loss: 0.9964 (value: 0.0025, weighted value: 0.1234, policy: 0.8729, weighted policy: 0.8729), Train Mean Max: 0.6824
+Epoch 4/10, Train Loss: 0.9800 (value: 0.0022, weighted value: 0.1097, policy: 0.8703, weighted policy: 0.8703), Train Mean Max: 0.6846
+Epoch 5/10, Train Loss: 0.9703 (value: 0.0020, weighted value: 0.1016, policy: 0.8687, weighted policy: 0.8687), Train Mean Max: 0.6862
+Epoch 6/10, Train Loss: 0.9554 (value: 0.0018, weighted value: 0.0900, policy: 0.8654, weighted policy: 0.8654), Train Mean Max: 0.6875
+Epoch 7/10, Train Loss: 0.9480 (value: 0.0017, weighted value: 0.0839, policy: 0.8642, weighted policy: 0.8642), Train Mean Max: 0.6887
+Epoch 8/10, Train Loss: 0.9405 (value: 0.0016, weighted value: 0.0802, policy: 0.8603, weighted policy: 0.8603), Train Mean Max: 0.6894
+Epoch 9/10, Train Loss: 0.9361 (value: 0.0015, weighted value: 0.0758, policy: 0.8604, weighted policy: 0.8604), Train Mean Max: 0.6902
+Epoch 10/10, Train Loss: 0.9246 (value: 0.0014, weighted value: 0.0690, policy: 0.8556, weighted policy: 0.8556), Train Mean Max: 0.6915
+..training done in 110.34 seconds
+..evaluation done in 86.00 seconds
+Old network+MCTS average reward: 0.55, min: -0.05, max: 1.20, stdev: 0.22
+New network+MCTS average reward: 0.56, min: -0.15, max: 1.16, stdev: 0.21
+Old bare network average reward: 0.36, min: -0.31, max: 1.05, stdev: 0.24
+New bare network average reward: 0.40, min: -0.29, max: 1.12, stdev: 0.23
+New network won 150 and tied 26 out of 300 games (54.33% wins where ties are half wins)
+Keeping the new network
+
+Training iteration 16 of 20: will play 3000 games, train, and evaluate on 300 games
+..games done in 421.23 seconds
+Training examples lengths: [64600, 64654, 65101, 64821, 65024, 64996, 64921, 64566, 64747, 64617]
+Training on 648047 examples
+Training with 317 batches of size 2048
+Epoch 1/10, Train Loss: 0.9234 (value: 0.0020, weighted value: 0.1024, policy: 0.8211, weighted policy: 0.8211), Train Mean Max: 0.6976
+Epoch 2/10, Train Loss: 0.9051 (value: 0.0017, weighted value: 0.0865, policy: 0.8186, weighted policy: 0.8186), Train Mean Max: 0.7014
+Epoch 3/10, Train Loss: 0.8891 (value: 0.0015, weighted value: 0.0742, policy: 0.8150, weighted policy: 0.8150), Train Mean Max: 0.7037
+Epoch 4/10, Train Loss: 0.8842 (value: 0.0015, weighted value: 0.0728, policy: 0.8114, weighted policy: 0.8114), Train Mean Max: 0.7048
+Epoch 5/10, Train Loss: 0.8729 (value: 0.0013, weighted value: 0.0641, policy: 0.8088, weighted policy: 0.8088), Train Mean Max: 0.7067
+Epoch 6/10, Train Loss: 0.8676 (value: 0.0012, weighted value: 0.0620, policy: 0.8056, weighted policy: 0.8056), Train Mean Max: 0.7076
+Epoch 7/10, Train Loss: 0.8674 (value: 0.0013, weighted value: 0.0626, policy: 0.8048, weighted policy: 0.8048), Train Mean Max: 0.7082
+Epoch 8/10, Train Loss: 0.8614 (value: 0.0012, weighted value: 0.0598, policy: 0.8016, weighted policy: 0.8016), Train Mean Max: 0.7090
+Epoch 9/10, Train Loss: 0.8568 (value: 0.0012, weighted value: 0.0582, policy: 0.7986, weighted policy: 0.7986), Train Mean Max: 0.7098
+Epoch 10/10, Train Loss: 0.8526 (value: 0.0011, weighted value: 0.0556, policy: 0.7970, weighted policy: 0.7970), Train Mean Max: 0.7109
+..training done in 111.02 seconds
+..evaluation done in 91.88 seconds
+Old network+MCTS average reward: 0.57, min: -0.06, max: 1.26, stdev: 0.22
+New network+MCTS average reward: 0.57, min: -0.14, max: 1.31, stdev: 0.22
+Old bare network average reward: 0.38, min: -0.21, max: 1.10, stdev: 0.23
+New bare network average reward: 0.39, min: -0.42, max: 1.19, stdev: 0.24
+New network won 145 and tied 39 out of 300 games (54.83% wins where ties are half wins)
+Keeping the new network
+
+Training iteration 17 of 20: will play 3000 games, train, and evaluate on 300 games
+..games done in 425.36 seconds
+Training examples lengths: [64654, 65101, 64821, 65024, 64996, 64921, 64566, 64747, 64617, 64661]
+Training on 648108 examples
+Training with 317 batches of size 2048
+Epoch 1/10, Train Loss: 0.8633 (value: 0.0019, weighted value: 0.0944, policy: 0.7688, weighted policy: 0.7688), Train Mean Max: 0.7159
+Epoch 2/10, Train Loss: 0.8352 (value: 0.0014, weighted value: 0.0714, policy: 0.7638, weighted policy: 0.7638), Train Mean Max: 0.7197
+Epoch 3/10, Train Loss: 0.8289 (value: 0.0014, weighted value: 0.0675, policy: 0.7614, weighted policy: 0.7614), Train Mean Max: 0.7214
+Epoch 4/10, Train Loss: 0.8221 (value: 0.0013, weighted value: 0.0640, policy: 0.7580, weighted policy: 0.7580), Train Mean Max: 0.7230
+Epoch 5/10, Train Loss: 0.8140 (value: 0.0012, weighted value: 0.0585, policy: 0.7555, weighted policy: 0.7555), Train Mean Max: 0.7240
+Epoch 6/10, Train Loss: 0.8084 (value: 0.0011, weighted value: 0.0560, policy: 0.7524, weighted policy: 0.7524), Train Mean Max: 0.7251
+Epoch 7/10, Train Loss: 0.8096 (value: 0.0012, weighted value: 0.0588, policy: 0.7507, weighted policy: 0.7507), Train Mean Max: 0.7256
+Epoch 8/10, Train Loss: 0.7989 (value: 0.0010, weighted value: 0.0508, policy: 0.7482, weighted policy: 0.7482), Train Mean Max: 0.7270
+Epoch 9/10, Train Loss: 0.8001 (value: 0.0011, weighted value: 0.0541, policy: 0.7461, weighted policy: 0.7461), Train Mean Max: 0.7273
+Epoch 10/10, Train Loss: 0.7964 (value: 0.0010, weighted value: 0.0510, policy: 0.7453, weighted policy: 0.7453), Train Mean Max: 0.7279
+..training done in 113.02 seconds
+..evaluation done in 96.60 seconds
+Old network+MCTS average reward: 0.57, min: -0.03, max: 1.10, stdev: 0.21
+New network+MCTS average reward: 0.58, min: 0.04, max: 1.13, stdev: 0.21
+Old bare network average reward: 0.40, min: -0.23, max: 1.03, stdev: 0.22
+New bare network average reward: 0.41, min: -0.11, max: 1.05, stdev: 0.22
+New network won 136 and tied 30 out of 300 games (50.33% wins where ties are half wins)
+Keeping the new network
+
+# (training was accidentally terminated here)
