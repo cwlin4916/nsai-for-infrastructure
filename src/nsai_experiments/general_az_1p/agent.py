@@ -166,6 +166,7 @@ class Agent():
         multiprocessing_stash = self.net.push_multiprocessing()
         arg_tuples = [(i, self._randseed("train"), self._randseed("mcts")) for i in range(self.n_games_per_train)]
         train_example_sets = self._starmap(self._play_for_examples, arg_tuples)
+        self.net.pop_multiprocessing(multiprocessing_stash)
         for train_examples in train_example_sets:
             new_train_examples.extend(train_examples)
         elapsed = time.time() - start_time
@@ -178,10 +179,8 @@ class Agent():
         flat_examples = list(itertools.chain.from_iterable(self.all_training_examples))
 
         # Save an old Agent to pit ourselves against, then train the network
-        # (note that net's multiprocessing is still pushed, so the copy will inherit the ability to be multiprocessed)
         self.game.reset_wrapper()
         self_before_training = copy.deepcopy(self)
-        self.net.pop_multiprocessing(multiprocessing_stash)
 
         # Sanity check: game states and network predictions on current state should be the
         # same before we train, assuming the network is deterministic. PyTorch inherent
@@ -211,12 +210,14 @@ class Agent():
         
         old_rewards, new_rewards, old_rewards_no_mcts, new_rewards_no_mcts = [], [], [], []
         start_time = time.time()
-        multiprocessing_stash = self.net.push_multiprocessing()
+        my_multiprocessing_stash = self.net.push_multiprocessing()
+        before_multiprocessing_stash = self_before_training.net.push_multiprocessing()
         # print("pred on old", self_before_training.game.obs, self_before_training.net.predict(self_before_training.game.obs))
         # print("pred on new", self.game.obs, self.net.predict(self.game.obs))
         arg_tuples = [(i, self._randseed("eval"), self._randseed("mcts"), self_before_training, PIT_NO_MCTS) for i in range(self.n_games_per_eval)]
         eval_results = self._starmap(self._play_for_eval, arg_tuples)
-        self.net.pop_multiprocessing(multiprocessing_stash)
+        self_before_training.net.pop_multiprocessing(before_multiprocessing_stash)
+        self.net.pop_multiprocessing(my_multiprocessing_stash)
         for old_reward, new_reward, old_reward_no_mcts, new_reward_no_mcts in eval_results:
             old_rewards.append(old_reward)
             new_rewards.append(new_reward)
