@@ -1,5 +1,7 @@
-import gymnasium as gym
 import io
+import re
+
+import gymnasium as gym
 from nltk import PCFG
 
 from nsai_experiments.zoning_game.zg_cfg import ZONING_GAME_GRAMMAR
@@ -42,20 +44,57 @@ class ZoningLangEnv(gym.Env):
         assert render_mode is None or render_mode in self.metadata["render_modes"]
         self.render_mode = render_mode
 
+        # Extract terminals and nonterminals
         self.terminals, self.nonterminals = extract_grammar_symbols(grammar)
-        self.num_tokens = len(self.terminals) + len(self.nonterminals)
+        
+        # Create bidirectional mappings between symbols and integers
+        # Reserve 0 for pad token
+        all_symbols = [self.pad_token] + list(self.terminals) + list(self.nonterminals)
+        self.symbol_to_int = {symbol: i for i, symbol in enumerate(all_symbols)}
+        self.int_to_symbol = {i: symbol for i, symbol in enumerate(all_symbols)}
+        self.num_tokens = len(all_symbols)
+        
+        # Create set of nonterminal indices for quick lookup
+        self.nonterminal_indices = {self.symbol_to_int[nt] for nt in self.nonterminals}
+        self.pad_token_int = self.symbol_to_int[self.pad_token]
 
         # Action space is (index, production)
         self.action_space = gym.spaces.Tuple((gym.spaces.Discrete(self.max_length), gym.spaces.Discrete(self.max_productions)))
-        # Observation space is the current sequence of productions
+        # Observation space is the current sequence of token indices
         self.observation_space = gym.spaces.MultiDiscrete([self.num_tokens] * self.max_length)
     
     def _get_obs(self):
-        """Get the current observation."""
-        obs = [str(symbol) for symbol in self.current_program]
+        """Get the current observation as a list of token indices."""
+        obs = [self.symbol_to_int[symbol] for symbol in self.current_program]
         # Pad the observation to max_length
-        obs += [self.pad_token] * (self.max_length - len(obs))
+        obs += [self.pad_token_int] * (self.max_length - len(obs))
         return obs
+    
+    def get_indices_of_nonterminals(self, obs):
+        """Get the indices of all nonterminals in an observation.
+        
+        Args:
+            obs: List of token indices (observation from environment)
+            
+        Returns:
+            list: Indices of all nonterminals in the observation
+        """
+        indices = []
+        for i, token_int in enumerate(obs):
+            if token_int != self.pad_token_int and token_int in self.nonterminal_indices:
+                indices.append(i)
+        return indices
+    
+    def decode_obs(self, obs):
+        """Convert an observation (list of integers) to human-readable symbols.
+        
+        Args:
+            obs: List of token indices
+            
+        Returns:
+            list: List of symbols (strings or NLTK symbols)
+        """
+        return [str(self.int_to_symbol[token_int]) for token_int in obs]
     
     def _get_terminated_truncated(self):
         terminated = all(symbol not in self.nonterminals for symbol in self.current_program)
@@ -77,7 +116,9 @@ class ZoningLangEnv(gym.Env):
         assert self.render_mode == "ansi"
         buf = io.StringIO()
         terminated, truncated = self._get_terminated_truncated()
-        print(f"Current program:\n'''\n{" ".join(str(symbol) for symbol in self.current_program)}\n'''", file=buf)
+        program_str = " ".join(str(symbol) for symbol in self.current_program)
+        program_str = re.sub(r";\s*", ";\n", program_str)  # newline after semicolon for legibility
+        print(f"Current program:\n'''\n{program_str}\n'''", file=buf)
         print(f"terminated = {terminated}, truncated = {truncated}.", file=buf)
         buf.seek(0)
         return buf
@@ -136,8 +177,14 @@ class ZoningLangEnv(gym.Env):
         # Valid action: update the current program
         self.current_program = new_program
         self.n_moves += 1
+
+        terminated, truncated = self._get_terminated_truncated()
+        reward = self._eval_reward() if terminated or truncated else 0  # only reward at the end
+        if terminated:
+            print(f"Finished with reward {reward}")
         
         # Return observation, reward, terminated, truncated, info
-        reward = 0  # TODO: define reward structure
-        return self._get_obs(), reward, *self._get_terminated_truncated(), self._get_info()
+        return self._get_obs(), reward, terminated, truncated, self._get_info()
     
+    def _eval_reward(self):
+        return 100  # TODO
