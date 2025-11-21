@@ -1,4 +1,5 @@
 from collections.abc import Iterable
+import hashlib
 import io
 import itertools
 from multiprocessing.pool import Pool
@@ -109,6 +110,13 @@ class ZoningLangEnv(gym.Env):
         self.nonterminal_indices = {self.symbol_to_int[nt] for nt in self.nonterminals}
         self.pad_token_int = self.symbol_to_int[self.pad_token]
 
+        # Build lookup dictionary from nonterminal symbol to matching productions
+        self._nonterminal_to_productions = {}
+        for nonterminal in self.nonterminals:
+            matching = [(i, prod) for i, prod in enumerate(grammar.productions()) 
+                       if prod.lhs() == nonterminal]
+            self._nonterminal_to_productions[nonterminal] = matching
+
         # Action space is (index, production)
         self.action_space = gym.spaces.Tuple((gym.spaces.Discrete(self.max_length), gym.spaces.Discrete(self.max_productions)))
         # Observation space is the current sequence of token indices
@@ -136,6 +144,22 @@ class ZoningLangEnv(gym.Env):
                 indices.append(i)
         return indices
     
+    def get_productions_for_nonterminal(self, nonterminal):
+        """Get all productions that can be applied to a nonterminal.
+        
+        Args:
+            nonterminal: Either a nonterminal symbol or a nonterminal integer
+            
+        Returns:
+            list: List of (production_index, production) tuples where production.lhs() matches the nonterminal
+        """
+        # Convert integer to symbol if needed
+        if isinstance(nonterminal, int):
+            nonterminal = self.int_to_symbol[nonterminal]
+        
+        # Direct dictionary lookup (will raise KeyError if nonterminal not found)
+        return self._nonterminal_to_productions[nonterminal]
+    
     def decode_obs(self, obs):
         """Convert an observation (list of integers) to human-readable symbols.
         
@@ -155,7 +179,8 @@ class ZoningLangEnv(gym.Env):
     def _get_info(self):
         return {}
     
-    def reset(self, seed = None):
+    def reset(self, seed = None, options = None):
+        assert options is None
         super().reset(seed = seed)
         self.current_program = [self.grammar.start()]
         self.n_moves = 0
@@ -244,7 +269,8 @@ class ZoningLangEnv(gym.Env):
     
     def _eval_reward(self, on_invalid, use_tqdm=False):
         program_str = self.stringify_program()
-        rand_base = self.eval_rand + hash(program_str) % 2**20  # TODO think more deeply about this
+        program_hash = int(hashlib.sha256(program_str.encode()).hexdigest(), 16) % 2**20  # fancy hash for determinism across runs
+        rand_base = self.eval_rand + program_hash  # TODO think more deeply about this
         policy_seeds = range(rand_base, rand_base + self.eval_n)
         env_seeds = [range(a, a + self.eval_n) for a in [rand_base*i for i in range(self.eval_n)]]
         ruleset_score = zl_evaluate_ruleset(program_str,
