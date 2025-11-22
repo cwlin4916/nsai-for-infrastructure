@@ -18,8 +18,8 @@ class MCTSTreeNode():
     nn_value: Any  # The result of the value network for this state
     action_mask: Any  # A bit vector of action validity for this state
     total_N: int  # Total number of visits to this node, should equal sum(action_N.values())
-    action_Q: dict[int, float]  # Q value for each action from this state
-    action_N: dict[int, int]  # Number of visits for each action from this state
+    action_Q: dict[tuple, float]  # Q value for each action from this state
+    action_N: dict[tuple, int]  # Number of visits for each action from this state
 
     def __init__(self, direct_reward: float, is_terminal_state: bool):
         self.direct_reward = direct_reward
@@ -74,18 +74,23 @@ class MCTS():
                 assert mystate == self.game.hashable_obs
             
             mynode = self.nodes[mystate]
-            counts = np.array([mynode.action_N.get(a, 0) for a in range(len(mynode.nn_policy))])  # dictionary lookup misses in the case of action masked
+            
+            # Build counts array directly in the policy shape
+            counts = np.zeros_like(mynode.nn_policy)
+            for action, count in mynode.action_N.items():
+                counts[action] = count
         
         if msg: print(msg, "mynode", mynode, "counts", counts)
         counts = counts ** (1./self.temperature)
         probs = counts / counts.sum()
+        
         return probs
         
     def search(self, msg) -> float:
         # NOTE does not guarantee that self.game will be in the same state upon exit
         mystate = self.game.hashable_obs
         # TODO HACK to get the step count
-        if msg: print(msg, "BEGIN: searching state", self.game.obs, "step_count", self.game.env.step_count, "hash", hash(self.game.hashable_obs), "len nodes", len(self.nodes))
+        if msg: print(msg, "BEGIN: searching state", self.game.obs, "step_count", self.game.step_count, "hash", hash(self.game.hashable_obs), "len nodes", len(self.nodes))
 
         # Initialize node if we've not been here before
         if mystate not in self.nodes:
@@ -113,7 +118,7 @@ class MCTS():
         
         # Recursive case: select the best action using UCB with action masking and descend the tree
         ucbs = self.calc_masked_ucbs(mynode, entab(msg, " ucb"))
-        best_action: int = np.argmax(ucbs)  # type: ignore
+        best_action = np.unravel_index(np.argmax(ucbs), ucbs.shape)
         if msg: print(msg, "-> taking action", best_action, "based on UCBs", ucbs)
         self.game.step_wrapper(best_action)
         reward = self.search(entab(msg, " recurse"))
@@ -128,8 +133,6 @@ class MCTS():
         "Query the policy-value network and perform some basic validation"
         mypolicy, myvalue = self.net.predict(self.game.obs)
         if msg: print(msg, "Queried NN: policy", mypolicy, "value", myvalue)
-        if len(mypolicy.shape) != 1:
-            raise ValueError(f"Expected policy to be 1D, got {mypolicy.shape}")
         if len(myvalue.shape) != 0:
             raise ValueError(f"Expected value to be scalar, got {myvalue.shape}")
         return mypolicy, myvalue
@@ -152,21 +155,25 @@ class MCTS():
 
         return mypolicy, myvalue, myaction_mask
     
-    def calc_masked_ucbs(self, mynode: MCTSTreeNode, msg) -> list[float]:
-        indices_to_calculate, = np.nonzero(mynode.action_mask)
+    def calc_masked_ucbs(self, mynode: MCTSTreeNode, msg) -> np.ndarray:
+        # TODO PERF this was super optimized and then the implementation changed for multidimensional actions, need to reoptimize
+        # Get all valid action indices as tuples
+        valid_actions = list(zip(*np.nonzero(mynode.action_mask)))
 
-        qs = np.fromiter((mynode.action_Q.get(action, 0.0) for action in indices_to_calculate), dtype=float, count=len(indices_to_calculate))
-        ns = np.fromiter((mynode.action_N.get(action, 0) for action in indices_to_calculate), dtype=int, count=len(indices_to_calculate))
-
-        ucbs = qs + self.c_exploration * mynode.nn_policy[indices_to_calculate] * np.sqrt(mynode.total_N + EPS) / (1 + ns)
-
+        # Initialize UCB array with -inf for invalid actions
         all_ucbs = np.full(mynode.nn_policy.shape, -np.inf)
-        all_ucbs[indices_to_calculate] = ucbs
-
-        if msg:
-            for i, action in enumerate(indices_to_calculate):
-                print(msg, "calc_ucb for action", action, "action Q", qs[i], "c_exploration", self.c_exploration, "nn policy", mynode.nn_policy[action], "total N", mynode.total_N, "action N", ns[i])
-                print(msg, "ucb result", ucbs[i])
+        
+        # Calculate UCB for each valid action
+        for action in valid_actions:
+            q = mynode.action_Q.get(action, 0.0)
+            n = mynode.action_N.get(action, 0)
+            ucb = q + self.c_exploration * mynode.nn_policy[action] * np.sqrt(mynode.total_N + EPS) / (1 + n)
+            all_ucbs[action] = ucb
+            
+            if msg:
+                print(msg, "calc_ucb for action", action, "action Q", q, "c_exploration", self.c_exploration, "nn policy", mynode.nn_policy[action], "total N", mynode.total_N, "action N", n)
+                print(msg, "ucb result", ucb)
+        
         return all_ucbs
 
     def update_edge(self, mynode: MCTSTreeNode, action: int, reward: float):

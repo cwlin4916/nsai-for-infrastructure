@@ -29,6 +29,7 @@ class Game(ABC, Generic[ObsType, ActType]):
         self.terminated = None
         self.truncated = None
         self.info = None
+        self.step_count = None
 
     @abstractmethod
     def step(self, action: ActType) -> Tuple[ObsType, Any, bool, bool, dict[str, Any]]:
@@ -69,6 +70,7 @@ class Game(ABC, Generic[ObsType, ActType]):
         self.terminated = None
         self.truncated = None
         self.info = info
+        self.step_count = 0
         return obs, info
     
     def step_wrapper(self, action: ActType) -> Tuple[ObsType, Any, bool, bool, dict[str, Any]]:
@@ -78,6 +80,7 @@ class Game(ABC, Generic[ObsType, ActType]):
         self.terminated = terminated
         self.truncated = truncated
         self.info = info
+        self.step_count += 1
         return obs, reward, terminated, truncated, info
     
     def stash_state(self) -> Any:

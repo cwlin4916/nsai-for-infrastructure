@@ -270,6 +270,10 @@ class ZoningGameEnv(gym.Env):
         Options for `on_invalid`: `None` does nothing, `"warn"` logs a warning, `"error"`
         raises an error
         """
+        if isinstance(action, tuple):
+            if len(action) != 1:
+                raise ValueError(f"If action is a tuple, it must have length 1, got length {len(action)}")
+            action, = action
         coords = (action // self.grid_size, action % self.grid_size)
         if Tile(self.tile_grid[*coords]) is not Tile.EMPTY:
             if on_invalid is not None:

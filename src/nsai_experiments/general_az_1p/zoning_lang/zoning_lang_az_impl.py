@@ -360,7 +360,7 @@ class ZoningLangPolicyValueNet(TorchPolicyValueNet):
             policy_prob = F.softmax(policy_logits, dim=-1)  # (1, seq_len, num_productions)
         
         # Return (seq_len, num_productions) and scalar value
-        return policy_prob.squeeze(0).numpy(), value.item()
+        return policy_prob.squeeze(0).numpy(), value.numpy().squeeze()
     
     def push_multiprocessing(self):
         self._reset_torch_rng()

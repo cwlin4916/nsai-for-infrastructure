@@ -117,6 +117,9 @@ class ZoningLangEnv(gym.Env):
                        if prod.lhs() == nonterminal]
             self._nonterminal_to_productions[nonterminal] = matching
 
+        # Cache for evaluation results: (program_str, eval_rand) -> score
+        self._eval_cache = {}
+
         # Action space is (index, production)
         self.action_space = gym.spaces.Tuple((gym.spaces.Discrete(self.max_length), gym.spaces.Discrete(self.max_productions)))
         # Observation space is the current sequence of token indices
@@ -180,6 +183,7 @@ class ZoningLangEnv(gym.Env):
         return {}
     
     def reset(self, seed = None, options = None):
+        print(f"RESETTING GYM with {seed=}")
         assert options is None
         super().reset(seed = seed)
         self.current_program = [self.grammar.start()]
@@ -261,8 +265,8 @@ class ZoningLangEnv(gym.Env):
 
         terminated, truncated = self._get_terminated_truncated()
         reward = self._eval_reward(on_invalid=on_invalid, use_tqdm=use_tqdm) if terminated or truncated else 0  # only reward at the end
-        if terminated:
-            print(f"Finished with reward {reward}")
+        # if terminated:
+        #     print(f"Finished with reward {reward}")
         
         # Return observation, reward, terminated, truncated, info
         return self._get_obs(), reward, terminated, truncated, self._get_info()
@@ -270,9 +274,20 @@ class ZoningLangEnv(gym.Env):
     def _eval_reward(self, on_invalid, use_tqdm=False):
         program_str = self.stringify_program()
         program_hash = int(hashlib.sha256(program_str.encode()).hexdigest(), 16) % 2**20  # fancy hash for determinism across runs
-        rand_base = self.eval_rand + program_hash  # TODO think more deeply about this
+        # TODO think more deeply about this, I think it's actually bad to always use the
+        # same random seeds to evaluate a given program but it'd be nice if we could keep
+        # this for caching's sake
+        rand_base = self.eval_rand + program_hash
+
+        # Check cache
+        cache_key = (program_str, rand_base)
+        if cache_key in self._eval_cache:
+            ruleset_score = self._eval_cache[cache_key]
+            return ruleset_score
+
         policy_seeds = range(rand_base, rand_base + self.eval_n)
         env_seeds = [range(a, a + self.eval_n) for a in [rand_base*i for i in range(self.eval_n)]]
+        print(f"Cache miss for {cache_key=}, {program_hash=}, {self.eval_rand=}")
         ruleset_score = zl_evaluate_ruleset(program_str,
                          policy_seeds=policy_seeds,
                          env_seeds=env_seeds,
@@ -280,4 +295,9 @@ class ZoningLangEnv(gym.Env):
                          env_kwargs=self.env_kwargs,
                          n_procs=self.eval_num_procs,
                          use_tqdm=use_tqdm)
+        print(f"Evaluation complete, ruleset score: {ruleset_score}")
+        
+        # Store in cache
+        self._eval_cache[cache_key] = ruleset_score
+        
         return ruleset_score
