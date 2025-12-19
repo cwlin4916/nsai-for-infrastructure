@@ -124,6 +124,8 @@ class ZoningLangEnv(gym.Env):
         self.action_space = gym.spaces.Tuple((gym.spaces.Discrete(self.max_length), gym.spaces.Discrete(self.max_productions)))
         # Observation space is the current sequence of token indices
         self.observation_space = gym.spaces.MultiDiscrete([self.num_tokens] * self.max_length)
+
+        self.last_prod = None
     
     def _get_obs(self):
         """Get the current observation as a list of token indices."""
@@ -180,7 +182,9 @@ class ZoningLangEnv(gym.Env):
         return terminated, truncated
     
     def _get_info(self):
-        return {}
+        return {
+            "last_prod": self.last_prod
+            }
     
     def reset(self, seed = None, options = None):
         print(f"RESETTING GYM with {seed=}")
@@ -262,6 +266,8 @@ class ZoningLangEnv(gym.Env):
         # Valid action: update the current program
         self.current_program = new_program
         self.n_moves += 1
+
+        self.last_prod = production
 
         terminated, truncated = self._get_terminated_truncated()
         reward = self._eval_reward(on_invalid=on_invalid, use_tqdm=use_tqdm) if terminated or truncated else 0  # only reward at the end

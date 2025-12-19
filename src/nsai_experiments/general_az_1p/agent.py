@@ -130,6 +130,9 @@ class Agent():
                 selected_move = self.external_policy(self.game.obs)
                 if msg: print(msg, "external policy selmove", selected_move)
             self.game.step_wrapper(selected_move)
+            # Temporary, for ZLAZ debugging:
+            # print(self.game.info["last_prod"])
+            # print(self.game.env.unwrapped.stringify_program())
             rewards.append(self.game.reward)
             if self.game.terminated or self.game.truncated:
                 break

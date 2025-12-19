@@ -83,6 +83,8 @@ class MCTS():
         if msg: print(msg, "mynode", mynode, "counts", counts)
         counts = counts ** (1./self.temperature)
         probs = counts / counts.sum()
+        # For debugging:
+        # print(probs)
         
         return probs
         
