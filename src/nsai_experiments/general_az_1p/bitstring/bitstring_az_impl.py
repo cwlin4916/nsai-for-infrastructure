@@ -103,7 +103,15 @@ class BitStringGameGym(gym.Env):
 
         normalizer = self.nsites # playing around with scale of pi vs value loss
         if self.sparsemode:
-            r = sum(self.state)/normalizer if done else 0
+            if done:
+                filledness = sum(self.state) / normalizer  # 0 if all 0s, 1 if all 1s
+                # turn_inefficiency = self.step_count / (normalizer-self.nones)  # 1 if did it in minimum number of turns, 2 if took 2x as long, etc.
+                # print(self.step_count)
+                # r = filledness/turn_inefficiency  # 1 if filledness=1 and turn_inefficiency=1, decreases from there
+                r = filledness
+                # print("state", self.state, "r", r, flush=True)
+            else:
+                r = 0
         # if done:
         #     print ("Net Episode done <s, r, t, steps>", self.state, r, done, self.step_count)
         return self.state, r, done, done, {}
