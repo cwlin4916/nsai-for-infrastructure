@@ -20,8 +20,12 @@ def main():
                     n_past_iterations_to_train=10, n_games_per_train=3000, n_games_per_eval=300, threshold_to_keep = 0.5,
                     mcts_params={"n_simulations": 100, "c_exploration": 0.5},
                     external_policy_creators_to_pit={"random": create_policy_random, "individual greedy": create_policy_indiv_greedy, "total greedy": create_policy_total_greedy})
+    
 
-    myagent.play_train_multiple(20)
+    mynet.load_checkpoint("zgaz_checkpoints/1757654225_iter_200")
+    myagent.load_checkpoint("zgaz_checkpoints/1757654225_iter_200")
+
+    myagent.play_train_multiple(1000, checkpoint_every=20, checkpoint_dir="/scratch/gkonars/NSAI/zgaz/zgaz_checkpoints", start_at=200)
 
 if __name__ == "__main__":
     main()
