@@ -66,6 +66,7 @@ class Agent():
         self.mcts_params = mcts_params if mcts_params is not None else {}
         self.n_procs = n_procs
         self.external_policy = external_policy
+        self.run_start_time = int(time.time())
         print(f"Agent config: {n_games_per_train=}, {n_games_per_eval=}, {n_past_iterations_to_train=}, {threshold_to_keep=}, {reward_discount=}, {mcts_params=}, {n_procs=}, {external_policy=}, {external_policy_creators_to_pit=}")
 
         if self.n_procs is None or self.n_procs >= 0:
@@ -300,10 +301,15 @@ class Agent():
         print(f"New network won {wins} and tied {ties} out of {self.n_games_per_eval} games ({score:.2%} wins where ties are half wins)")
         return score
     
-    def play_train_multiple(self, n_trains: int):
-        for i in range(n_trains):
+    def play_train_multiple(self, n_trains: int, start_at = 0, checkpoint_every = None, checkpoint_dir = "general_az_1p_checkpoint"):
+        for i in range(start_at, n_trains):
             print(f"\nTraining iteration {i+1} of {n_trains}: will play {self.n_games_per_train} games, train, and evaluate on {self.n_games_per_eval} games")
             self.play_and_train()
+            if checkpoint_every is not None and (i + 1) % checkpoint_every == 0:
+                checkpoint_subdir = Path(checkpoint_dir) / f"{self.run_start_time}_iter_{i+1}"
+                print(f"Saving intermediate checkpoint to {checkpoint_subdir}")
+                self.save_checkpoint(checkpoint_subdir)
+                self.net.save_checkpoint(checkpoint_subdir)
 
     def push_multiprocessing(self):
         my_info = self.all_training_examples
