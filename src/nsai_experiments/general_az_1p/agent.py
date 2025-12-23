@@ -85,7 +85,7 @@ class Agent():
         for rng_name in self.RNG_NAMES:
             seed = random_seeds.get(rng_name, None)
             self.rngs[rng_name] = np.random.default_rng(seed)
-        if all(rng_name in random_seeds for rng_name in self.RNG_NAMES):
+        if all(rng_name in random_seeds or (rng_name == "external_policy" and self.external_policy is None) for rng_name in self.RNG_NAMES):
             print(f"RNG seeds are fully specified")
         else:
             print(f"RNG seeds are not fully specified, using nondeterministic seeds for: {', '.join(rng_name for rng_name in self.RNG_NAMES if rng_name not in random_seeds)}")
