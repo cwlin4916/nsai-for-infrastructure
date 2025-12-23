@@ -19,7 +19,7 @@ def main():
     myagent = Agent(mygame, mynet, n_procs=10, random_seeds={"mcts": 48, "train": 49, "eval": 50})
 
     logging.getLogger().setLevel(logging.WARN)
-    myagent.play_train_multiple(1)
+    myagent.play_train_multiple(100)
 
 if __name__ == "__main__":
     main()
