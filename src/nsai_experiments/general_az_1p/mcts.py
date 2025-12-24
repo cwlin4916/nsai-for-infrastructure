@@ -122,7 +122,13 @@ class MCTS():
         ucbs = self.calc_masked_ucbs(mynode, entab(msg, " ucb"))
         best_action = np.unravel_index(np.argmax(ucbs), ucbs.shape)
         if msg: print(msg, "-> taking action", best_action, "based on UCBs", ucbs)
-        self.game.step_wrapper(best_action)
+
+        # Distinguish scalar actions from 1-tuple actions and step
+        to_step = best_action
+        if len(self.game.action_space.shape) == 0: to_step, = to_step
+        assert to_step in self.game.action_space
+        self.game.step_wrapper(to_step)
+
         reward = self.search(entab(msg, " recurse"))
         # reward = self.search("")
         

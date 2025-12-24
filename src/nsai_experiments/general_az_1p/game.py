@@ -65,6 +65,8 @@ class Game(ABC, Generic[ObsType, ActType]):
 
     def reset_wrapper(self, *args, **kwargs):
         obs, info = self.reset(*args, **kwargs)
+        if obs not in self.observation_space:
+            raise ValueError(f"Observation {obs} not in observation space {self.observation_space}")
         self.obs = obs
         self.reward = None
         self.terminated = None
@@ -74,7 +76,11 @@ class Game(ABC, Generic[ObsType, ActType]):
         return obs, info
     
     def step_wrapper(self, action: ActType) -> Tuple[ObsType, Any, bool, bool, dict[str, Any]]:
+        if action not in self.action_space:
+            raise ValueError(f"Action {action} not in action space {self.action_space}")
         obs, reward, terminated, truncated, info = self.step(action)
+        if obs not in self.observation_space:
+            raise ValueError(f"Observation {obs} not in observation space {self.observation_space}")
         self.obs = obs
         self.reward = reward
         self.terminated = terminated
