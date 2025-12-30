@@ -197,7 +197,7 @@ class GrammarEnv(gym.Env):
         a = [action // self.action_space.nvec[1], action % self.action_space.nvec[1]]
         return self.step_with_mask(a)
 
-    def reset(self):
+    def reset(self, seed = None):
         self.state = [self.pad_tok for _ in range(self.observation_space.shape[0])]
         self.state[0] = self.symdict['S']
         self.state = np.array(self.state)

@@ -67,7 +67,8 @@ class GrammarNetEnv(gym.Env):
             subdone = False
             while not subdone:
                 subaction = self.agent.apply_rules(parsed_rules)  # bad action/rule -> subaction = -1
-                substate, subreward, subdone, subtrucnc, _ = self.game_env.step(subaction)
+                substate, subreward, subdone, subtrunc, _ = self.game_env.step(subaction)
+                subdone = subdone or subtrunc
                 reward += subreward
 #            print ("RULE CREATED  ", rule['rule'], "   ", reward)
 
@@ -76,7 +77,7 @@ class GrammarNetEnv(gym.Env):
     def get_action_mask(self, state = None):
         return self.grammar_env.get_action_mask(state)
     
-    def reset(self):
+    def reset(self, seed = None):
         self.grammar_env.reset()
         self.game_env.reset()
         return self.grammar_env.state, {}

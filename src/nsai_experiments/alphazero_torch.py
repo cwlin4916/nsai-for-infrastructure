@@ -30,9 +30,9 @@ from gymnasium import wrappers
 import matplotlib.pyplot as plt
 plt.style.use('ggplot')
 
-from .deps.helpers import argmax, check_space, store_safely, stable_normalizer, smooth, symmetric_remove, Database
-from .deps.make_game import make_game
-from .deps.netgame import make_netgame
+from .new_games_old_engine.helpers import argmax, check_space, store_safely, stable_normalizer, smooth, symmetric_remove, Database
+from .new_games_old_engine.make_game import make_game
+from .new_games_old_engine.netgame import make_netgame
 
 from nsai_experiments import line_extending_game_gym
 from nsai_experiments.line_extending_game_gym import WindowlessLineExtendingGameEnv
@@ -167,7 +167,7 @@ class State():
     def evaluate(self):
         ''' Bootstrap the state value '''
 #        print(self.index)
-        self.V = np.squeeze(self.model.predict_V(self.index[None,])) if not self.terminal else torch.Tensor([0.0])          
+        self.V = np.squeeze(self.model.predict_V(self.index[None,])) if not self.terminal else torch.Tensor(np.array(0.0))          
 
     def update(self):
         ''' update count on backward pass '''
@@ -442,6 +442,7 @@ if __name__ == '__main__':
 #         i = 0
 #         while not done:
 #             a = a_best[i]
-#             _,_,done,_ = Env.step(a)
+#             _,_,done,trunc,_ = Env.step(a)
+#             done = done or trunc
 #             Env.render()
 #             i += 1

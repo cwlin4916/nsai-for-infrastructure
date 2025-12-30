@@ -41,8 +41,10 @@ def check_space(space):
         discrete = True
     elif isinstance(space,spaces.MultiDiscrete):
         dim = space.nvec
+        # dim = len(space.nvec)
         discrete = True
     else:
+        # raise NotImplementedError('This type of space is not supported')
         print ("Weird space", type(space), space)
         dim = None
         discrete = False
@@ -138,7 +140,7 @@ class Database():
         
         arrays = []
         for i in range(len(batch[0])):
-#            to_add = np.array([entry[i] for entry in batch])
+            # to_add = np.array([entry[i] for entry in batch])
             to_add = [entry[i] for entry in batch]
             arrays.append(to_add) 
         return tuple(arrays)
