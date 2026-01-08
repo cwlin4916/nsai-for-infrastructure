@@ -30,3 +30,6 @@ Our single-player AlphaZero implementation is entirely novel; however, we were p
 
 ## References
 [1] Silver, D., Schrittwieser, J., Simonyan, K., Antonoglou, I., Huang, A., Guez, A., Hubert, T., Baker, L., Lai, M., Bolton, A., Chen, Y., Lillicrap, T., Hui, F., Sifre, L., van den Driessche, G., Graepel, T., & Hassabis, D. (2017). Mastering the game of Go without human knowledge. Nature, 550(7676), 354–359. https://doi.org/10.1038/nature24270
+
+## Citation
+This codebase was authored by Gabriel Konar-Steenberg and Peter Graf and is published by the Alliance for Energy Innovation, LLC, which operates the National Laboratory of the Rockies, under software record SWR-26-016. A DOI number is pending.
