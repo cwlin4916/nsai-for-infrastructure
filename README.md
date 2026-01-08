@@ -19,7 +19,7 @@ If possible, prefer a newer version of PyTorch (e.g., >= 2.6).
 ## Running Tests
 Simply invoke `pytest`:
 ```bash
-pytest
+python -m pytest
 ```
 
 ## Inspiration
