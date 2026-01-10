@@ -22,6 +22,11 @@ Simply invoke `pytest`:
 python -m pytest
 ```
 
+## Demos
+A few entry points to quickly get a feel for what this codebase can do:
+
+  * `python -m nsai_experiments.general_az_1p.cartpole.cartpole_easy_demo`: run a few iterations of single-player AlphaZero on [the Cart Pole game](https://gymnasium.farama.org/environments/classic_control/cart_pole/), declaring victory if the pole is still up after 100 moves. You should observe that (a) rewards generally increase over iterations, quickly approaching 1 for this relatively easy game; (b) "new" rewards are generally greater than "old" rewards; and (c) "network+MCTS" rewards are generally greater than "bare network" rewards.
+
 ## Inspiration
 Our single-player AlphaZero implementation is entirely novel; however, we were particularly inspired by these existing implementations:
 
