@@ -26,6 +26,7 @@ python -m pytest
 A few entry points to quickly get a feel for what this codebase can do:
 
   * `python -m nsai_experiments.general_az_1p.cartpole.cartpole_easy_demo`: run a few iterations of single-player AlphaZero on [the Cart Pole game](https://gymnasium.farama.org/environments/classic_control/cart_pole/), declaring victory if the pole is still up after 100 moves. You should observe that (a) rewards generally increase over iterations, quickly approaching 1 for this relatively easy game; (b) "new" rewards are generally greater than "old" rewards; and (c) "network+MCTS" rewards are generally greater than "bare network" rewards.
+  * `python -m nsai_experiments.general_az_1p.zoning_game.zgaz_easy_demo`: run some iterations of single-player AlphaZero on our novel Zoning Game. It's a little noisy here (see `zgaz_demo.py` for a version that does more self-play per neural network training session), and 30 iterations does not begin to approach peak performance, but if you take a moving average you should see definite upwards progress. This demo takes about 27 minutes on a system with 64 AMD Genoa CPU cores and 1 NVIDIA H100 GPU.
 
 ## Inspiration
 Our single-player AlphaZero implementation is entirely novel; however, we were particularly inspired by these existing implementations:
