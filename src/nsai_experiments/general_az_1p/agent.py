@@ -295,14 +295,14 @@ class Agent():
         # Print stats, keep new network iff it wins >= threshold_to_keep fraction of games
         old_rewards = eval_results_arrays["old_net"]
         new_rewards = eval_results_arrays["new_net"]
-        print(f"Old network+MCTS average reward: {old_rewards.mean():.2f}, min: {old_rewards.min():.2f}, max: {old_rewards.max():.2f}, stdev: {old_rewards.std():.2f}")
-        print(f"New network+MCTS average reward: {new_rewards.mean():.2f}, min: {new_rewards.min():.2f}, max: {new_rewards.max():.2f}, stdev: {new_rewards.std():.2f}")
+        print(f"Old network+MCTS average reward: {old_rewards.mean():.4f}, min: {old_rewards.min():.4f}, max: {old_rewards.max():.4f}, stdev: {old_rewards.std():.4f}")
+        print(f"New network+MCTS average reward: {new_rewards.mean():.4f}, min: {new_rewards.min():.4f}, max: {new_rewards.max():.4f}, stdev: {new_rewards.std():.4f}")
 
         if PIT_NO_MCTS:
             old_rewards_no_mcts = eval_results_arrays["old_net_no_mcts"]
             new_rewards_no_mcts = eval_results_arrays["new_net_no_mcts"]
-            print(f"Old bare network average reward: {old_rewards_no_mcts.mean():.2f}, min: {old_rewards_no_mcts.min():.2f}, max: {old_rewards_no_mcts.max():.2f}, stdev: {old_rewards_no_mcts.std():.2f}")
-            print(f"New bare network average reward: {new_rewards_no_mcts.mean():.2f}, min: {new_rewards_no_mcts.min():.2f}, max: {new_rewards_no_mcts.max():.2f}, stdev: {new_rewards_no_mcts.std():.2f}")
+            print(f"Old bare network average reward: {old_rewards_no_mcts.mean():.4f}, min: {old_rewards_no_mcts.min():.4f}, max: {old_rewards_no_mcts.max():.4f}, stdev: {old_rewards_no_mcts.std():.4f}")
+            print(f"New bare network average reward: {new_rewards_no_mcts.mean():.4f}, min: {new_rewards_no_mcts.min():.4f}, max: {new_rewards_no_mcts.max():.4f}, stdev: {new_rewards_no_mcts.std():.4f}")
 
         for policy_name in self.external_policy_creators_to_pit.keys():
             rewards = eval_results_arrays[policy_name]

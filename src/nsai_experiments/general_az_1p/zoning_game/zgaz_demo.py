@@ -22,10 +22,12 @@ def main():
                     external_policy_creators_to_pit={"random": create_policy_random, "individual greedy": create_policy_indiv_greedy, "total greedy": create_policy_total_greedy})
     
 
-    mynet.load_checkpoint("zgaz_checkpoints/1757654225_iter_200")
-    myagent.load_checkpoint("zgaz_checkpoints/1757654225_iter_200")
+    myagent.play_train_multiple(1000, checkpoint_every=20, checkpoint_dir="/scratch/gkonars/NSAI/zgaz/zgaz_checkpoints")
+    
+    # mynet.load_checkpoint("zgaz_checkpoints/1757654225_iter_200")
+    # myagent.load_checkpoint("zgaz_checkpoints/1757654225_iter_200")
 
-    myagent.play_train_multiple(1000, checkpoint_every=20, checkpoint_dir="/scratch/gkonars/NSAI/zgaz/zgaz_checkpoints", start_at=200)
+    # myagent.play_train_multiple(1000, checkpoint_every=20, checkpoint_dir="/scratch/gkonars/NSAI/zgaz/zgaz_checkpoints", start_at=200)
 
 if __name__ == "__main__":
     main()
