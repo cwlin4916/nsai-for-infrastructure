@@ -564,16 +564,18 @@ if __name__ == "__main__":
     import os
 
     # Default Configuration
+    # Default Configuration (Phase 3 Rigorous Defaults)
     config = {
         "nsites": 10,
         "sparsemode": True,
         "n_iters": 100,
         "n_games_per_train": 100,
-        "n_games_per_eval": 10,
-        "mcts_sims": 30,
-        "c_expl": 0.4,
-        "epochs": 5,
-        "lr": 1e-2,
+        "n_games_per_eval": 30,   # [CHANGED] 10 -> 30
+        "mcts_sims": 50,          # [CHANGED] 30 -> 50
+        "c_expl": 1.5,            # [CHANGED] 0.4 -> 1.5
+        "epochs": 10,             # [CHANGED] 5 -> 10
+        "lr": 1e-3,               # [CHANGED] 1e-2 -> 1e-3
+        "threshold": 0.55,        # [CHANGED] 0.4 -> 0.55
     }
 
     # 1. Parse CLI Arguments
@@ -583,12 +585,29 @@ if __name__ == "__main__":
     parser.add_argument("--iters", type=int, help="Total training iterations")
     parser.add_argument("--sparse", action="store_true", help="Use sparse rewards (default: True)")
     parser.add_argument("--dense", action="store_true", help="Use dense rewards")
+    
+    # New Hyperparameters
+    parser.add_argument("--c_expl", type=float, help="Exploration constant (PUCT)")
+    parser.add_argument("--mcts_sims", type=int, help="MCTS simulations per move")
+    parser.add_argument("--epochs", type=int, help="Training epochs per iteration")
+    parser.add_argument("--lr", type=float, help="Learning Rate")
+    parser.add_argument("--threshold", type=float, help="Evaluation win rate threshold")
+    parser.add_argument("--eval_games", type=int, help="Games per evaluation round")
+
     args = parser.parse_args()
 
     # 2. Update Config from CLI
     if args.nsites: config["nsites"] = args.nsites
     if args.iters: config["n_iters"] = args.iters
     if args.dense: config["sparsemode"] = False
+    if args.sparse: config["sparsemode"] = True
+    
+    if args.c_expl: config["c_expl"] = args.c_expl
+    if args.mcts_sims: config["mcts_sims"] = args.mcts_sims
+    if args.epochs: config["epochs"] = args.epochs
+    if args.lr: config["lr"] = args.lr
+    if args.threshold: config["threshold"] = args.threshold
+    if args.eval_games: config["n_games_per_eval"] = args.eval_games
 
     # 3. Interactive Mode
     if args.interactive:
@@ -606,11 +625,25 @@ if __name__ == "__main__":
             val = input(f"Total Iterations [default: {config['n_iters']}]: ").strip()
             if val: config["n_iters"] = int(val)
 
+            # Hyperparameters
             val = input(f"MCTS Simulations [default: {config['mcts_sims']}]: ").strip()
             if val: config["mcts_sims"] = int(val)
 
+            val = input(f"Exploration Constant c_expl [default: {config['c_expl']}]: ").strip()
+            if val: config["c_expl"] = float(val)
+
             val = input(f"Training Epochs [default: {config['epochs']}]: ").strip()
             if val: config["epochs"] = int(val)
+
+            val = input(f"Learning Rate [default: {config['lr']}]: ").strip()
+            if val: config["lr"] = float(val)
+            
+            val = input(f"Eval Threshold [default: {config['threshold']}]: ").strip()
+            if val: config["threshold"] = float(val)
+
+            val = input(f"Eval Games [default: {config['n_games_per_eval']}]: ").strip()
+            if val: config["n_games_per_eval"] = int(val)
+
         except ValueError as e:
             print(f"Invalid input, using defaults. Error: {e}")
         print("\nConfiguration Complete.\n")
@@ -646,12 +679,13 @@ if __name__ == "__main__":
     )
 
     # USE TrackingAgent instead of Agent
+    # USE TrackingAgent instead of Agent
     myagent = TrackingAgent(
         mygame, 
         mynet, 
         n_games_per_train=config["n_games_per_train"], 
         n_games_per_eval=config["n_games_per_eval"], 
-        threshold_to_keep=0.4,  
+        threshold_to_keep=config['threshold'],  
         n_past_iterations_to_train=5,
         random_seeds={"mcts": 48, "train": 49, "eval": 50}, 
         mcts_params={"n_simulations": config["mcts_sims"], "c_exploration": config["c_expl"]}
