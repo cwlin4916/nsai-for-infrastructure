@@ -382,7 +382,7 @@ class TrackingAgent(Agent):
         }
         self.cumulative_reward = 0.0
 
-    def play_single_game(self, max_moves: int = 10_000, random_seed: int | None = None, msg = ""):
+    def play_single_game(self, max_moves: int = 10_000, random_seed: int | None = None, msg = "", add_noise=False):
         # We override this to store cumulative reward for 'pit' evaluation
         train_examples = []
         rewards = []
@@ -394,7 +394,7 @@ class TrackingAgent(Agent):
         for i in range(max_moves):
             if msg: print(msg, f"starting move {i}")
             if self.external_policy is None:
-                move_probs = mcts.perform_simulations(entab(msg, f", m{i+1}"))
+                move_probs = mcts.perform_simulations(entab(msg, f", m{i+1}"), add_noise=add_noise)
                 self.game = mcts.game 
                 train_examples.append((deepcopy(self.game.obs), (move_probs, None)))
                 
@@ -576,6 +576,9 @@ if __name__ == "__main__":
         "epochs": 10,
         "lr": 1e-3,
         "threshold": 0.55,
+        "use_gating": True,       # [ADDED] Default: Gating enabled
+        "dirichlet_alpha": 0.3,   # [ADDED] Default: Alpha=0.3
+        "dirichlet_epsilon": 0.25 # [ADDED] Default: Epsilon=0.25
     }
 
     # 1. Parse CLI Arguments
@@ -585,6 +588,9 @@ if __name__ == "__main__":
     parser.add_argument("--iters", type=int, help="Total training iterations")
     parser.add_argument("--sparse", action="store_true", help="Use sparse rewards (default: True)")
     parser.add_argument("--dense", action="store_true", help="Use dense rewards")
+    parser.add_argument("--nogating", action="store_true", help="Disable gating mechanism (always accept new net)")
+    parser.add_argument("--dirichlet_alpha", type=float, help="Dirichlet noise alpha (default: 0.3)")
+    parser.add_argument("--dirichlet_epsilon", type=float, help="Dirichlet noise epsilon (default: 0.25)")
     
     # New Hyperparameters
     parser.add_argument("--c_expl", type=float, help="Exploration constant (PUCT)")
@@ -608,6 +614,9 @@ if __name__ == "__main__":
     if args.lr: config["lr"] = args.lr
     if args.threshold: config["threshold"] = args.threshold
     if args.eval_games: config["n_games_per_eval"] = args.eval_games
+    if args.nogating: config["use_gating"] = False
+    if args.dirichlet_alpha: config["dirichlet_alpha"] = args.dirichlet_alpha
+    if args.dirichlet_epsilon: config["dirichlet_epsilon"] = args.dirichlet_epsilon
 
     # 3. Interactive Mode
     if args.interactive:
@@ -643,6 +652,19 @@ if __name__ == "__main__":
 
             val = input(f"Eval Games [default: {config['n_games_per_eval']}]: ").strip()
             if val: config["n_games_per_eval"] = int(val)
+            
+            # Gating Selection
+            current_gating = "yes" if config["use_gating"] else "no"
+            val = input(f"Enable Gating (pit new vs old)? (yes/no) [default: {current_gating}]: ").strip().lower()
+            if val in ["no", "n", "false"]: config["use_gating"] = False
+            elif val in ["yes", "y", "true"]: config["use_gating"] = True
+            
+            # Dirichlet Noise
+            val = input(f"Dirichlet Alpha [default: {config['dirichlet_alpha']}]: ").strip()
+            if val: config["dirichlet_alpha"] = float(val)
+            
+            val = input(f"Dirichlet Epsilon [default: {config['dirichlet_epsilon']}]: ").strip()
+            if val: config["dirichlet_epsilon"] = float(val)
 
         except ValueError as e:
             print(f"Invalid input, using defaults. Error: {e}")
@@ -653,7 +675,22 @@ if __name__ == "__main__":
     # --- SETUP RUN DIRECTORY ---
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     mode_str = "sparse" if config["sparsemode"] else "dense"
-    run_name = f"run_{timestamp}_bitstring_n{config['nsites']}_{mode_str}"
+    
+    # Rigorous Directory Naming
+    # run_TIMESTAMP_nSITES_MODE_itITERS_simSIMS_cEXPL
+    run_name_parts = [
+        f"run_{timestamp}",
+        f"n{config['nsites']}",
+        mode_str,
+        f"it{config['n_iters']}",
+        f"sim{config['mcts_sims']}",
+        f"c{config['c_expl']}"
+    ]
+    if not config["use_gating"]:
+        run_name_parts.append("nogating")
+        
+    run_name_parts.append(f"da{config['dirichlet_alpha']}")
+    run_name = "_".join(run_name_parts)
     run_dir = Path(run_name)
     run_dir.mkdir(parents=True, exist_ok=True)
     
@@ -686,9 +723,15 @@ if __name__ == "__main__":
         n_games_per_train=config["n_games_per_train"], 
         n_games_per_eval=config["n_games_per_eval"], 
         threshold_to_keep=config['threshold'],  
+        use_gating=config['use_gating'],
         n_past_iterations_to_train=5,
         random_seeds={"mcts": 48, "train": 49, "eval": 50}, 
-        mcts_params={"n_simulations": config["mcts_sims"], "c_exploration": config["c_expl"]}
+        mcts_params={
+            "n_simulations": config["mcts_sims"], 
+            "c_exploration": config["c_expl"],
+            "dirichlet_alpha": config["dirichlet_alpha"],
+            "dirichlet_epsilon": config["dirichlet_epsilon"]
+        }
     )
 
     # 5. Execution Loop (Unrolled)

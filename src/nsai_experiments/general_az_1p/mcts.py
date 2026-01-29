@@ -46,7 +46,9 @@ class MCTS():
     def __init__(self, game: Game, net: PolicyValueNet,
                  n_simulations: int = 25,
                  temperature: float = 1.0,
-                 c_exploration: float = 1.0):
+                 c_exploration: float = 1.0,
+                 dirichlet_alpha: float = 0.3,
+                 dirichlet_epsilon: float = 0.25):
         self.game = game
         self.net = net
         self.nodes = {}
@@ -54,12 +56,14 @@ class MCTS():
         self.n_simulations = n_simulations
         self.temperature = temperature
         self.c_exploration = c_exploration
+        self.dirichlet_alpha = dirichlet_alpha
+        self.dirichlet_epsilon = dirichlet_epsilon
 
         # min max Q value
         self.q_min = float('inf')
         self.q_max = float('-inf')
 
-    def perform_simulations(self, msg):
+    def perform_simulations(self, msg, add_noise=False):
         """
         Perform `n_simulations` simulations from the current game state, then return move
         probabilities from exponentiated visit counts. Special case: if `n_simulations` is
@@ -77,6 +81,41 @@ class MCTS():
             if msg: print(msg, "n_simulations < 0, directly querying policy net")
             counts, _, _ = self.query_net_masked(msg)
         else:
+            # Check for root node existence and expand if needed
+            if mystate not in self.nodes:
+                if msg: print(msg, "Root node not found, expanding immediately")
+                # Temporarily stash state to query net safely
+                old_game_state = self.game.stash_state()
+                self.search(entab(msg, ", root expand"))
+                self.game = self.game.unstash_state(old_game_state)
+            
+            mynode = self.nodes[mystate]
+
+            # Add Dirichlet Noise (only if requested and node is fresh)
+            if add_noise and mynode.total_N == 0:
+                if msg: print(msg, f"Adding Dirichlet Noise (alpha={self.dirichlet_alpha}, eps={self.dirichlet_epsilon})")
+                noise = np.random.dirichlet([self.dirichlet_alpha] * len(mynode.nn_policy))
+                
+                # Apply noise only to valid moves to preserve the mask
+                # Optimization: if using masked policy, we should mix noise properly.
+                # Here we assume nn_policy is already masked and normalized by query_net_masked.
+                # However, Dirichlet noise is over ALL entries usually.
+                # Standard AlphaZero: add noise to legal moves only, or add to all and re-mask.
+                
+                # Rigorous approach: Mix noise into policy, then re-mask and re-normalize.
+                # But since our policy is already masked, mixing with unmasked noise might introduce invalid moves.
+                # So we should mask the noise too.
+                
+                mask = mynode.action_mask
+                masked_noise = noise * mask
+                sum_noise = masked_noise.sum()
+                if sum_noise > 0:
+                    masked_noise /= sum_noise
+                    mynode.nn_policy = (1 - self.dirichlet_epsilon) * mynode.nn_policy + self.dirichlet_epsilon * masked_noise
+                else: 
+                     # Should basically never happen if mask has valid moves
+                     warnings.warn("Dirichlet noise sum is zero after masking, skipping noise injection")
+
             for i in range(self.n_simulations):
                 old_game_state = self.game.stash_state()
                 self.search(entab(msg,  f", simulation {i+1}/{self.n_simulations}"))
