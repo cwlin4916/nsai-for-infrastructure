@@ -564,18 +564,18 @@ if __name__ == "__main__":
     import os
 
     # Default Configuration
-    # Default Configuration (Phase 3 Rigorous Defaults)
+    # Default Configuration (User Specific)
     config = {
-        "nsites": 10,
-        "sparsemode": True,
-        "n_iters": 100,
+        "nsites": 6,              # [CHANGED] 10 -> 6
+        "sparsemode": False,      # [CHANGED] True -> False (Dense)
+        "n_iters": 40,            # [CHANGED] 100 -> 40
         "n_games_per_train": 100,
-        "n_games_per_eval": 30,   # [CHANGED] 10 -> 30
-        "mcts_sims": 50,          # [CHANGED] 30 -> 50
-        "c_expl": 1.5,            # [CHANGED] 0.4 -> 1.5
-        "epochs": 10,             # [CHANGED] 5 -> 10
-        "lr": 1e-3,               # [CHANGED] 1e-2 -> 1e-3
-        "threshold": 0.55,        # [CHANGED] 0.4 -> 0.55
+        "n_games_per_eval": 30,
+        "mcts_sims": 30,          # [CHANGED] 50 -> 30
+        "c_expl": 1.5,
+        "epochs": 10,
+        "lr": 1e-3,
+        "threshold": 0.55,
     }
 
     # 1. Parse CLI Arguments
