@@ -4,3 +4,13 @@
 *.pt
 zgaz_checkpoints
 zgaz_test_checkpoint*
+
+# Experiment outputs
+runs/
+run_*/
+
+# macOS
+.DS_Store
+
+# Python
+__pycache__/
