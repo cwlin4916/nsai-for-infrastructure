@@ -107,32 +107,79 @@ class CartPoleGame(EnvGame):
 # =============================================================================
 class CartPoleModel(nn.Module):
     """
-    Standard Policy-Value network for CartPole.
+    Policy-Value network for CartPole with LayerNorm for gradient stability.
     
     Architecture:
-        Input:  4 dimensions (cart position, cart velocity, pole angle, pole velocity)
-        Body:   MLP with ReLU activations
-        Heads:  Policy (2 logits) + Value (1 scalar)
+        1. INPUT PROJECTION:
+           - Linear(4 → hidden_size) → LayerNorm → ReLU
+           - LayerNorm applied AFTER projection (not on raw input)
+           - Rationale: Raw input has disparate units (meters vs radians)
+        
+        2. HIDDEN TOWER:
+           - For each layer: Linear → LayerNorm → ReLU
+           - LayerNorm stabilizes optimization by fixing second moment of activations
+        
+        3. POLICY HEAD:
+           - Linear(hidden_size → 2) returning raw logits
+           - Softmax applied externally (CrossEntropyLoss expects logits)
+        
+        4. VALUE HEAD:
+           - Linear(hidden_size → 1) → Sigmoid
+           - Sigmoid bounds V(s) ∈ [0, 1] to match normalized rewards
     
     Justification:
-        Simple MLP is sufficient for CartPole's low-dimensional state space.
+        - LayerNorm over BatchNorm: works with any batch size, no running stats
+        - Sigmoid on value: prevents predicting impossible values outside [0,1]
+        - No LN on raw input: preserves physical meaning of state dimensions
     """
-    _INPUT_SIZE = 4  # CartPole observation space size
+    _INPUT_SIZE = 4  # CartPole observation space: [x, x_dot, theta, theta_dot]
     
     def __init__(self, n_hidden_layers=2, hidden_size=128):
         super().__init__()
-        self.body = nn.Sequential(
-            nn.Sequential(nn.Linear(self._INPUT_SIZE, hidden_size), nn.ReLU()),
-            *[nn.Sequential(nn.Linear(hidden_size, hidden_size), nn.ReLU()) for _ in range(n_hidden_layers)],
+        
+        # 1. Input Embedding (LayerNorm AFTER projection, not on raw input)
+        self.input_block = nn.Sequential(
+            nn.Linear(self._INPUT_SIZE, hidden_size),
+            nn.LayerNorm(hidden_size),
+            nn.ReLU()
         )
+        
+        # 2. Deep Body with LayerNorm
+        layers = []
+        for _ in range(n_hidden_layers):
+            layers.append(nn.Linear(hidden_size, hidden_size))
+            layers.append(nn.LayerNorm(hidden_size))
+            layers.append(nn.ReLU())
+        self.body = nn.Sequential(*layers)
+        
+        # 3. Policy Head (raw logits for CrossEntropyLoss)
         self.policy_head = nn.Linear(hidden_size, 2)  # 2 actions: Left, Right
-        self.value_head = nn.Linear(hidden_size, 1)
+        
+        # 4. Value Head with Sigmoid → [0, 1]
+        self.value_head = nn.Sequential(
+            nn.Linear(hidden_size, 1),
+            nn.Sigmoid()
+        )
+        
+        # Initialize weights (Kaiming for ReLU layers)
+        self._init_weights()
+    
+    def _init_weights(self):
+        """Apply Kaiming initialization for ReLU networks."""
+        for m in self.modules():
+            if isinstance(m, nn.Linear):
+                nn.init.kaiming_normal_(m.weight, mode='fan_in', nonlinearity='relu')
+                if m.bias is not None:
+                    nn.init.zeros_(m.bias)
 
     def forward(self, x):
+        x = self.input_block(x)
         x = self.body(x)
-        policy = self.policy_head(x)
+        
+        policy_logits = self.policy_head(x)
         value = self.value_head(x).squeeze(-1)
-        return policy, value
+        
+        return policy_logits, value
 
 
 # =============================================================================
