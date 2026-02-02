@@ -297,11 +297,12 @@ class Agent():
         elapsed = time.time() - start_time
         print(f"..training done in {elapsed:.2f} seconds")
 
-        # Evaluate & Gating
+        # Evaluate (always run to get metrics for plotting)
+        eval_stats = self.pit(self_before_training)
+        
+        # Gating: conditionally revert to old network
         if self.use_gating:
-            eval_stats = self.pit(self_before_training)
             score = eval_stats['score']
-            
             if score >= self.threshold_to_keep:
                 print("Keeping the new network")
             else:
@@ -309,14 +310,6 @@ class Agent():
                 self.net = self_before_training.net
         else:
             print("Accepted by default (gating disabled)")
-            # Create dummy stats for history to avoid breaking structure
-            eval_stats = {
-                'score': 1.0,
-                'new_reward_mean': np.nan,
-                'new_reward_std': np.nan,
-                'old_reward_mean': np.nan,
-                'old_reward_std': np.nan
-            }
         
         # Calculate average game length
         avg_game_len = np.mean([len(game_trace) for game_trace in train_example_sets])
