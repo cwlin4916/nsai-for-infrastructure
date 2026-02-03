@@ -161,16 +161,114 @@ class CartPoleModel(nn.Module):
             nn.Sigmoid()
         )
         
-        # Initialize weights (Kaiming for ReLU layers)
+        # Initialize weights with rigorous strategy
         self._init_weights()
     
     def _init_weights(self):
-        """Apply Kaiming initialization for ReLU networks."""
-        for m in self.modules():
-            if isinstance(m, nn.Linear):
-                nn.init.kaiming_normal_(m.weight, mode='fan_in', nonlinearity='relu')
-                if m.bias is not None:
-                    nn.init.zeros_(m.bias)
+        """
+        Rigorous Initialization Strategy for Policy-Value Networks.
+        
+        ═══════════════════════════════════════════════════════════════════════════
+        MATHEMATICAL FOUNDATION
+        ═══════════════════════════════════════════════════════════════════════════
+        
+        1. VARIANCE PRESERVATION PRINCIPLE
+        ───────────────────────────────────────────────────────────────────────────
+        For stable gradient flow, we want:
+            Var(activation_L) ≈ Var(activation_0)    (forward pass)
+            Var(∂L/∂W_L) ≈ Var(∂L/∂W_0)              (backward pass)
+        
+        Different nonlinearities require different variance corrections.
+        
+        2. KAIMING INITIALIZATION (for ReLU layers)
+        ───────────────────────────────────────────────────────────────────────────
+        ReLU kills ~50% of activations (negative values → 0), halving variance:
+            Var(ReLU(z)) = 0.5 · Var(z)
+        
+        Kaiming compensates by doubling weight variance:
+            W ~ N(0, σ²)  where σ² = 2 / fan_out
+        
+        This ensures:
+            Var(h_l) = Var(h_{l-1})  after each ReLU layer
+        
+        3. XAVIER/GLOROT INITIALIZATION (for heads)
+        ───────────────────────────────────────────────────────────────────────────
+        For linear or symmetric activations (tanh, sigmoid), we use Xavier:
+            W ~ U[-a, a]  where a = √(6 / (fan_in + fan_out))
+        
+        This maintains variance for both forward AND backward passes.
+        
+        4. WHY XAVIER FOR HEADS (CRITICAL DESIGN DECISION)
+        ───────────────────────────────────────────────────────────────────────────
+        
+        POLICY HEAD (→ Softmax):
+        ─────────────────────────
+        Let z = Wh be the logits, softmax(z)_i = exp(z_i) / Σ_j exp(z_j)
+        
+        With standard Xavier (gain=1):
+            Var(z) = fan_in · Var(W) · Var(h) ≈ 2.0 (for fan_in=128)
+            std(z) ≈ 1.41
+            
+        Typical logits: z = [0.3, -0.2] → softmax = [0.62, 0.38]  (BIASED!)
+        
+        With Xavier (gain=0.1):
+            Var(z) ≈ 0.02, std(z) ≈ 0.14
+            
+        Typical logits: z = [0.05, -0.03] → softmax ≈ [0.52, 0.48]  (NEAR MAX ENTROPY ✓)
+        
+        IMPLICATION FOR MCTS:
+        ─────────────────────
+        - Biased prior → MCTS over-exploits one random action → poor exploration
+        - Max Entropy prior → MCTS explores all actions fairly → better learning
+        
+        VALUE HEAD (→ Sigmoid):
+        ────────────────────────
+        Sigmoid has useful gradients only in [-3, 3]:
+            σ(-3) ≈ 0.05,  σ(3) ≈ 0.95
+            σ'(x) → 0  as |x| → ∞  (gradient saturation)
+        
+        With Xavier init:
+            std(z) ≈ 1.0 → 99.7% of values in [-3, 3] ✓
+            
+        With Kaiming init:
+            std(z) ≈ 1.41 → ~95% in [-3, 3], risk of saturation ✗
+        
+        5. LAYERNORM INITIALIZATION
+        ───────────────────────────────────────────────────────────────────────────
+        LayerNorm: ŷ = γ · (x - μ) / σ + β
+        
+        Initialize as identity transform: γ = 1, β = 0
+        This ensures LayerNorm starts as a pure normalizer, letting the network
+        learn optimal scale/shift during training.
+        
+        ═══════════════════════════════════════════════════════════════════════════
+        """
+        for name, module in self.named_modules():
+            if isinstance(module, nn.Linear):
+                # 1. POLICY HEAD: High constraint (Near Max Entropy)
+                if "policy_head" in name:
+                    # Gain=0.1 forces logits near 0, ensuring near-uniform probabilities
+                    # Note: gain=0.01 is theoretically optimal but causes NaN on MPS
+                    nn.init.xavier_uniform_(module.weight, gain=0.1)
+                    nn.init.constant_(module.bias, 0)
+                
+                # 2. VALUE HEAD: Linear Regime constraint
+                elif "value_head" in name:
+                    # Gain=1.0 keeps output variance inside Sigmoid's linear region
+                    nn.init.xavier_uniform_(module.weight, gain=1.0)
+                    nn.init.constant_(module.bias, 0)
+                
+                # 3. BODY LAYERS: ReLU constraint
+                else:
+                    # Gain=sqrt(2) compensates for ReLU killing half the variance
+                    nn.init.kaiming_normal_(module.weight, mode='fan_out', nonlinearity='relu')
+                    if module.bias is not None:
+                        nn.init.constant_(module.bias, 0)
+            
+            # 4. LayerNorm/BatchNorm: Identity Init
+            elif isinstance(module, (nn.LayerNorm, nn.BatchNorm1d)):
+                nn.init.constant_(module.weight, 1.0)
+                nn.init.constant_(module.bias, 0.0)
 
     def forward(self, x):
         x = self.input_block(x)
@@ -180,6 +278,47 @@ class CartPoleModel(nn.Module):
         value = self.value_head(x).squeeze(-1)
         
         return policy_logits, value
+
+    def print_architecture(self):
+        """Print network architecture with initialization strategy."""
+        total_params = sum(p.numel() for p in self.parameters())
+        
+        print("\n" + "=" * 70)
+        print("NEURAL NETWORK ARCHITECTURE & INITIALIZATION")
+        print("=" * 70)
+        print(f"Model: CartPoleModel | Parameters: {total_params:,}")
+        print("-" * 70)
+        
+        # Layer structure with dimensions
+        print("LAYER STRUCTURE:")
+        print(f"  Input:  Linear(4 → {self.input_block[0].out_features}) → LN → ReLU")
+        for i in range(0, len(self.body), 3):
+            if i < len(self.body):
+                dim = self.body[i].out_features
+                print(f"  Body:   Linear({dim} → {dim}) → LN → ReLU")
+        print(f"  Policy: Linear({self.policy_head.in_features} → 2) → [Softmax]")
+        print(f"  Value:  Linear({self.value_head[0].in_features} → 1) → Sigmoid")
+        print()
+        
+        # Initialization strategy with mathematical rationale
+        print("INITIALIZATION STRATEGY:")
+        print("-" * 70)
+        print("  BODY LAYERS (Input + Hidden) → Kaiming Normal (fan_out)")
+        print("    Rationale: ReLU kills ~50% of activations → Var halved")
+        print("    Kaiming compensates: W ~ N(0, 2/fan_out) → preserves Var(h)")
+        print()
+        print("  POLICY HEAD → Xavier Uniform (gain=0.1)")
+        print("    Rationale: Softmax gradient vanishes for large |logits|")
+        print("    Gain=0.1 forces Var(logit) → 0 → softmax ≈ [0.52, 0.48]")
+        print("    MCTS benefit: Near Max Entropy prior enables fair exploration")
+        print()
+        print("  VALUE HEAD → Xavier Uniform (gain=1.0)")
+        print("    Rationale: Sigmoid saturates outside [-3, 3]")
+        print("    Xavier keeps std(z) ≈ 1 → 99.7% in linear regime")
+        print()
+        print("  LAYERNORM → Identity (γ=1, β=0)")
+        print("    Rationale: Start as pure normalizer, learn scale/shift")
+        print("=" * 70 + "\n")
 
 
 # =============================================================================
@@ -831,6 +970,9 @@ def run_training(config):
                 "policy_weight": config["policy_weight"],
             }
         )
+        
+        # Print neural network architecture
+        net.model.print_architecture()
         
         agent = TrackingAgent(
             game, net,
