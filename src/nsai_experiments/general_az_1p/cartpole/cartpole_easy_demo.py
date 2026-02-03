@@ -21,7 +21,7 @@ def main():
                     n_past_iterations_to_train=2,
                     mcts_params={"c_exploration": 0.2})
 
-    myagent.play_train_multiple(3)
+    myagent.play_train_multiple(10)
 
 if __name__ == "__main__":
     main()
