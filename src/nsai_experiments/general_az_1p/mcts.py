@@ -31,7 +31,6 @@ class MCTSTreeNode():
 
         self.total_N = 0
         self.action_Q = {}
-        self.action_Q = {}
         self.action_N = {}
         self.q_u_history = []  # Log of (q, u) pairs for diagnosis
 
