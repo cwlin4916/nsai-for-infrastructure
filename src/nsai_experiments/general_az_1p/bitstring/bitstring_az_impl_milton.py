@@ -14,7 +14,6 @@ import gymnasium.spaces as spaces
 from typing import Hashable
 import warnings
 from copy import deepcopy
-from copy import deepcopy
 import time
 import sys
 import os
@@ -542,26 +541,10 @@ if __name__ == "__main__":
     disable_numpy_multithreading()
     use_deterministic_cuda()
 
-    import numpy as np
-    import argparse
-    import sys
-    import torch
-    import torch.nn as nn
-    import torch.nn.functional as F
-    from copy import deepcopy
-    import warnings
-
-    from nsai_experiments.general_az_1p.agent import Agent
-    # Classes are already defined in this file, no need to import them.
-    # from nsai_experiments.general_az_1p.bitstring.bitstring_az_impl_milton import BitStringGame, BitStringPolicyValueNet
-
-    # ... imports for plotting ...
+    # Only import modules not already imported at the top of the file
     from nsai_experiments.general_az_1p.bitstring.plot_metrics import plot_training_metrics
-    from nsai_experiments.general_az_1p.mcts import MCTS, entab
-    import time
     from datetime import datetime
     from pathlib import Path
-    import os
 
     # Default Configuration
     # Default Configuration (User Specific)
@@ -714,8 +697,6 @@ if __name__ == "__main__":
             "policy_weight": 2.0
         }
     )
-
-    # USE TrackingAgent instead of Agent
     # USE TrackingAgent instead of Agent
     myagent = TrackingAgent(
         mygame, 
