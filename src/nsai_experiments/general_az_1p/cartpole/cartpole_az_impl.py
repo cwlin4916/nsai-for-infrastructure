@@ -146,8 +146,10 @@ class CartPolePolicyValueNet(TorchPolicyValueNet):
                 loss = loss.item()
                 train_mini_losses.append(loss)
                 train_loss += loss
-                policy_loss += loss_policy
-                value_loss += loss_value
+                # Keep aggregate metrics as Python floats so Agent stays pickle-safe
+                # when passed to multiprocessing workers in later iterations.
+                policy_loss += loss_policy.item()
+                value_loss += loss_value.item()
 
             avg_train_loss = train_loss / len(train_loader)
             avg_value_loss = value_loss / len(train_loader)
