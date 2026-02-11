@@ -24,52 +24,7 @@ import torch.nn.functional as F
 
 from nsai_experiments.general_az_1p.game import EnvGame
 from nsai_experiments.general_az_1p.policy_value_net import TorchPolicyValueNet
-from nsai_experiments.general_az_1p.utils import get_accelerator
-
-# =============================================================================
-# Sub-Phase 1.2: CumulativeRewardWrapper (Sparse Reward Implementation)
-# =============================================================================
-class CumulativeRewardWrapper(gym.Wrapper):
-    """
-    Wrapper that implements SPARSE reward for CartPole:
-        - Reward is 0 at every intermediate step.
-        - At termination, reward = (steps_survived / max_steps).
-    
-    Justification:
-        AlphaZero's value function predicts cumulative future reward from a state.
-        Sparse, episodic rewards align better with this framework than dense +1/step.
-        Normalizing by max_steps keeps V(s) targets in [0, 1].
-    """
-    
-    def __init__(self, env, max_steps=100):
-        super().__init__(env)
-        self.step_count = 0
-        self.max_steps = max_steps
-    
-    def reset(self, **kwargs):
-        self.step_count = 0
-        return self.env.reset(**kwargs)
-    
-    def step(self, action):
-        observation, reward, terminated, truncated, info = self.env.step(action)
-        self.step_count += 1
-        
-        # Enforce max_steps truncation
-        if self.step_count >= self.max_steps:
-            truncated = True
-        
-        # SPARSE REWARD LOGIC
-        if terminated or truncated:
-            # Final reward = fraction of max steps survived
-            reward = self.step_count / self.max_steps
-        else:
-            reward = 0.0  # No intermediate reward
-        
-        # Invariant checks
-        assert reward == 0.0 or (terminated or truncated), "Non-zero reward only at terminal state"
-        assert 0.0 <= reward <= 1.0, f"Reward out of bounds: {reward}"
-            
-        return observation, reward, terminated, truncated, info
+from nsai_experiments.general_az_1p.utils import get_accelerator, Tee, CumulativeRewardWrapper
 
 
 # =============================================================================
@@ -458,33 +413,6 @@ class CartPolePolicyValueNet(TorchPolicyValueNet):
 # PHASE 2: Infrastructure Classes
 # =============================================================================
 
-# --- Sub-Phase 2.1: Tee Class (Dual Logging) ---
-class Tee:
-    """
-    A file-like object that writes to multiple streams simultaneously.
-    
-    Justification:
-        During training, we want console output for real-time monitoring AND
-        a log file for post-hoc analysis. This class duplicates writes to both.
-    
-    Usage:
-        log_file = open("log.txt", "w")
-        sys.stdout = Tee(sys.stdout, log_file)
-        print("This goes to both console and log.txt")
-    """
-    def __init__(self, *files):
-        self.files = files
-    
-    def write(self, obj):
-        for f in self.files:
-            f.write(obj)
-            f.flush()  # Ensure immediate write (important for crash recovery)
-    
-    def flush(self):
-        for f in self.files:
-            f.flush()
-
-
 # --- Sub-Phase 2.2: TrackingAgent (Agent with History Tracking) ---
 # NOTE: The base Agent class already includes `self.history` tracking
 # and returns detailed stats from `pit()`. We import it directly.
@@ -856,7 +784,8 @@ def create_run_directory(base_dir="runs"):
         Path to the created run directory.
     """
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    run_dir = Path(base_dir) / f"run_{timestamp}_cartpole"
+    base_dir = Path(__file__).parent / base_dir
+    run_dir = base_dir / f"run_{timestamp}_cartpole"
     run_dir.mkdir(parents=True, exist_ok=True)
     return run_dir
 
@@ -1179,7 +1108,7 @@ def run_ablation_experiment(config):
     
     # Save to runs directory with timestamp
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    comparison_path = Path("runs") / f"ablation_comparison_{timestamp}.png"
+    comparison_path = Path(__file__).parent / "runs" / f"ablation_comparison_{timestamp}.png"
     comparison_path.parent.mkdir(parents=True, exist_ok=True)
     
     plot_comparison(history_sigmoid, history_nosigmoid, save_path=comparison_path)

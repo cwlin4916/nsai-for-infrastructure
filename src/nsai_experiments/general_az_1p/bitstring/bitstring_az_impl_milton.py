@@ -6,7 +6,7 @@ import torch.nn.functional as F
 
 from nsai_experiments.general_az_1p.game import EnvGame
 from nsai_experiments.general_az_1p.policy_value_net import TorchPolicyValueNet
-from nsai_experiments.general_az_1p.utils import get_accelerator
+from nsai_experiments.general_az_1p.utils import get_accelerator, Tee, CumulativeRewardWrapper
 from nsai_experiments.general_az_1p.agent import Agent
 from nsai_experiments.general_az_1p.mcts import MCTS, entab
 
@@ -20,37 +20,6 @@ import os
 import argparse
 
 
-
-class CumulativeRewardWrapper(gym.Wrapper):
-    """Wrapper that changes reward behavior: 0 at every step, total steps at termination."""
-    
-    def __init__(self, env):
-        super().__init__(env)
-        self.step_count = 0
-        self.max_steps = env.max_steps
-        self.nsites = env.nsites  # Store the number of sites for later use
-    
-    def reset(self, **kwargs):
-        self.step_count = 0
-        return self.env.reset(**kwargs)
-    
-    def step(self, action):
-        observation, reward, terminated, truncated, info = self.env.step(action)
-        self.step_count += 1
-        if self.step_count >= self.max_steps:
-            truncated = True
-        
-        # Give 0 reward during the episode, final reward at termination
-        if terminated or truncated:
-            print(f"AM TERMINATED {terminated} OR TRUNCATED {truncated}")
-            reward = self.step_count / self.max_steps
-        else:
-            reward = 0
-
-        # assert reward == 0.0 or (terminated or truncated)
-        # assert reward <= 1.0
-            
-        return observation, reward, terminated, truncated, info
 
 class BitStringGameGym(gym.Env):
     metadata = {'render.modes': ['human']}
@@ -351,18 +320,6 @@ class BitStringAgent(Agent):
         
         return train_examples
 
-
-# Define helper classes at module level for pickling compatibility
-class Tee(object):
-    def __init__(self, *files):
-        self.files = files
-    def write(self, obj):
-        for f in self.files:
-            f.write(obj)
-            f.flush() # ensure immediate write
-    def flush(self):
-        for f in self.files:
-            f.flush()
 
 class TrackingAgent(Agent):
     """
@@ -674,7 +631,7 @@ if __name__ == "__main__":
         
     run_name_parts.append(f"da{config['dirichlet_alpha']}")
     run_name = "_".join(run_name_parts)
-    run_dir = Path(run_name)
+    run_dir = Path(__file__).parent / run_name
     run_dir.mkdir(parents=True, exist_ok=True)
     
     # Setup Logging
