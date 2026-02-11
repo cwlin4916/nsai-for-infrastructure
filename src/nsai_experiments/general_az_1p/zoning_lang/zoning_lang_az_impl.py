@@ -286,10 +286,19 @@ class ZoningLangPolicyValueNet(TorchPolicyValueNet):
                 value_loss += loss_value.item()
                 train_mean_max += mean_max.item()
 
-            train_losses.append(train_loss / len(train_loader))
+            avg_train_loss = train_loss / len(train_loader)
+            avg_value_loss = value_loss / len(train_loader)
+            avg_policy_loss = policy_loss / len(train_loader)
+            epoch_metrics = {
+                'total': avg_train_loss,
+                'value': avg_value_loss,
+                'policy': avg_policy_loss,
+                'weighted_policy': policy_weight * avg_policy_loss
+            }
+            train_losses.append(epoch_metrics)
             train_mean_maxes.append(train_mean_max / len(train_loader))
 
-            epoch_msg = f"Epoch {epoch+1}/{tp['epochs']}, Train Loss: {train_losses[-1]:.4f} (value: {value_loss / len(train_loader):.4f}, weighted value: {value_weight * (value_loss / len(train_loader)):.4f}, policy: {policy_loss / len(train_loader):.4f}, weighted policy: {policy_weight * (policy_loss / len(train_loader)):.4f}), Train Mean Max: {train_mean_maxes[-1]:.4f}"
+            epoch_msg = f"Epoch {epoch+1}/{tp['epochs']}, Train Loss: {avg_train_loss:.4f} (value: {avg_value_loss:.4f}, weighted value: {value_weight * avg_value_loss:.4f}, policy: {avg_policy_loss:.4f}, weighted policy: {epoch_metrics['weighted_policy']:.4f}), Train Mean Max: {train_mean_maxes[-1]:.4f}"
             # Validation phase
             if val_dataset is not None:
                 val_loss, val_mean_max = self.validate_inner(val_loader)

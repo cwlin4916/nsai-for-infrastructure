@@ -278,21 +278,9 @@ class Agent():
         # for i, (state, (policy, reward)) in enumerate(flat_examples):
         #     print(f"Example {i+1}/{len(flat_examples)}: state={state}, policy={policy}, reward={reward}")
         start_time = time.time()
-        # Capture training losses (could be a dict or list depending on implementation)
         _, _, train_losses = self.net.train(flat_examples, **({"print_all_epochs": True} if PRINT_ALL_EPOCHS else {}))
-        
-        # Breakdown losses if available (BitStringPolicyValueNet will return a dict)
-        if isinstance(train_losses, list) and len(train_losses) > 0:
-            # Handle legacy case (list of total losses)
-            if isinstance(train_losses[0], dict):
-                 loss_policy = train_losses[-1].get('policy', 0.0)
-                 loss_value = train_losses[-1].get('value', 0.0)
-            else:
-                 loss_policy = 0.0
-                 loss_value = train_losses[-1] # Fallback
-        else:
-             loss_policy = 0.0
-             loss_value = 0.0
+        loss_policy = train_losses[-1]['policy']
+        loss_value = train_losses[-1]['value']
 
         elapsed = time.time() - start_time
         print(f"..training done in {elapsed:.2f} seconds")

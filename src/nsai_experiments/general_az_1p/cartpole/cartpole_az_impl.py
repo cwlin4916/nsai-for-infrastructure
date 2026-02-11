@@ -149,10 +149,18 @@ class CartPolePolicyValueNet(TorchPolicyValueNet):
                 policy_loss += loss_policy
                 value_loss += loss_value
 
-            train_losses.append(train_loss / len(train_loader))
+            avg_train_loss = train_loss / len(train_loader)
+            avg_value_loss = value_loss / len(train_loader)
+            avg_policy_loss = policy_loss / len(train_loader)
+            epoch_metrics = {
+                'total': avg_train_loss,
+                'value': avg_value_loss,
+                'policy': avg_policy_loss,
+                'weighted_policy': policy_weight * avg_policy_loss
+            }
+            train_losses.append(epoch_metrics)
             if print_all_epochs or epoch == 0 or epoch == tp["epochs"] - 1:
-            # if True:
-                print(f"Epoch {epoch+1}/{tp['epochs']}, Train Loss: {train_losses[-1]:.4f} (value: {value_loss / len(train_loader):.4f}, policy: {policy_loss / len(train_loader):.4f}, weighted policy: {policy_weight * (policy_loss / len(train_loader)):.4f})")
+                print(f"Epoch {epoch+1}/{tp['epochs']}, Train Loss: {avg_train_loss:.4f} (value: {avg_value_loss:.4f}, policy: {avg_policy_loss:.4f}, weighted policy: {epoch_metrics['weighted_policy']:.4f})")
 
         return model, train_mini_losses, train_losses
     

@@ -458,18 +458,12 @@ class TrackingAgent(Agent):
         self_before_training = deepcopy(self)
         start_time = time.time()
         
-        # Capture dictionary losses
         _, _, train_losses = self.net.train(flat_examples, **({"print_all_epochs": True}))
         elapsed = time.time() - start_time
         print(f"..training done in {elapsed:.2f} seconds")
 
-        # Validate losses format
-        if isinstance(train_losses, list) and len(train_losses) > 0 and isinstance(train_losses[0], dict):
-             loss_policy = train_losses[-1].get('policy', 0.0)
-             loss_value = train_losses[-1].get('value', 0.0)
-        else:
-             loss_policy = 0.0 # Fallback
-             loss_value = 0.0
+        loss_policy = train_losses[-1]['policy']
+        loss_value = train_losses[-1]['value']
 
         # Evaluate
         eval_stats = self.pit(self_before_training)
