@@ -8,7 +8,7 @@ try:
 except ImportError:
     sns = None
 
-def plot_training_metrics(history, save_path=None):
+def plot_training_metrics(history, save_path=None, theoretical_max=1.0):
     """
     Plots a 3-panel dashboard of AlphaZero training metrics.
     
@@ -37,7 +37,7 @@ def plot_training_metrics(history, save_path=None):
     ax1.fill_between(iterations, reward_mean - reward_std, reward_mean + reward_std, color='b', alpha=0.2, label='Std Dev')
     
     # Theoretical Max Line
-    ax1.axhline(y=1.0, color='r', linestyle='--', label='Theoretical Max (1.0)')
+    ax1.axhline(y=theoretical_max, color='r', linestyle='--', label=f'Theoretical Max ({theoretical_max:.2f})')
     
     ax1.set_xlabel("Iteration")
     ax1.set_ylabel("Reward")
@@ -88,6 +88,7 @@ def plot_training_metrics(history, save_path=None):
     if save_path:
         plt.savefig(save_path)
         print(f"Plot saved to {save_path}")
+        plt.close(fig)
     else:
         plt.show()
 

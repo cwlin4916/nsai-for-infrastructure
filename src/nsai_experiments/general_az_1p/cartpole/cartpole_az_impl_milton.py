@@ -62,61 +62,57 @@ class CartPoleGame(EnvGame):
 # =============================================================================
 class CartPoleModel(nn.Module):
     """
-    Policy-Value network for CartPole with LayerNorm for gradient stability.
-    
+    Policy-Value network for CartPole.
+
     Architecture:
         1. INPUT PROJECTION:
-           - Linear(4 → hidden_size) → LayerNorm → ReLU
-           - LayerNorm applied AFTER projection (not on raw input)
-           - Rationale: Raw input has disparate units (meters vs radians)
-        
+           - Linear(4 → hidden_size) → ReLU
+
         2. HIDDEN TOWER:
-           - For each layer: Linear → LayerNorm → ReLU
-           - LayerNorm stabilizes optimization by fixing second moment of activations
-        
+           - For each layer: Linear → ReLU
+
         3. POLICY HEAD:
            - Linear(hidden_size → 2) returning raw logits
            - Softmax applied externally (CrossEntropyLoss expects logits)
-        
+
         4. VALUE HEAD:
-           - Linear(hidden_size → 1) → Raw (unbounded)
-           - Linear output allows faster gradient flow vs Sigmoid
-    
-    Architecture Choice (Ablation Study 2026-02-03):
-        Results showed Simple (No LN, No Sigmoid) achieves 0.988 reward
-        vs 0.24-0.40 for LayerNorm variants. LayerNorm may cause "unit mixing"
-        issues in heterogeneous state spaces like CartPole.
+           - Linear(hidden_size → 1) → Sigmoid → [0, 1]
+           - Sigmoid is critical for MCTS bootstrapping: at initialization,
+             σ(0) ≈ 0.5 provides a neutral value estimate. Without Sigmoid,
+             V ≈ 0 causes ~50% of states to get negative Q-values, which
+             makes MCTS systematically avoid half the state space and
+             produces worse-than-random play (see run_20260211 vs run_20260203).
+
+    Architecture Choice (2026-02-11):
+        No LayerNorm — causes "unit mixing" issues in heterogeneous state
+        spaces like CartPole (disparate units: meters vs radians).
     """
     _INPUT_SIZE = 4  # CartPole observation space: [x, x_dot, theta, theta_dot]
     
-    def __init__(self, n_hidden_layers=2, hidden_size=128, use_sigmoid_value=False):
+    def __init__(self, n_hidden_layers=2, hidden_size=128):
         super().__init__()
-        self.use_sigmoid_value = use_sigmoid_value
-        
-        # 1. Input Embedding (Simple: Linear + ReLU, no LayerNorm)
+
+        # 1. Input Embedding (Linear + ReLU, no LayerNorm)
         self.input_block = nn.Sequential(
             nn.Linear(self._INPUT_SIZE, hidden_size),
             nn.ReLU()
         )
-        
-        # 2. Body (Simple: Linear + ReLU only)
+
+        # 2. Body (Linear + ReLU only)
         layers = []
         for _ in range(n_hidden_layers):
             layers.append(nn.Linear(hidden_size, hidden_size))
             layers.append(nn.ReLU())
         self.body = nn.Sequential(*layers)
-        
+
         # 3. Policy Head (raw logits for CrossEntropyLoss)
         self.policy_head = nn.Linear(hidden_size, 2)  # 2 actions: Left, Right
-        
-        # 4. Value Head: Sigmoid → [0, 1] OR raw → (-∞, +∞)
-        if use_sigmoid_value:
-            self.value_head = nn.Sequential(
-                nn.Linear(hidden_size, 1),
-                nn.Sigmoid()
-            )
-        else:
-            self.value_head = nn.Linear(hidden_size, 1)
+
+        # 4. Value Head: Linear → Sigmoid → [0, 1]
+        self.value_head = nn.Sequential(
+            nn.Linear(hidden_size, 1),
+            nn.Sigmoid()
+        )
         
         # Initialize weights with rigorous strategy
         self._init_weights()
@@ -230,10 +226,10 @@ class CartPoleModel(nn.Module):
     def forward(self, x):
         x = self.input_block(x)
         x = self.body(x)
-        
+
         policy_logits = self.policy_head(x)
         value = self.value_head(x).squeeze(-1)
-        
+
         return policy_logits, value
 
     def print_architecture(self):
@@ -255,10 +251,7 @@ class CartPoleModel(nn.Module):
                 dim = self.body[i].out_features
                 print(f"  Body:   Linear({dim} → {dim}) → ReLU")
         print(f"  Policy: Linear({self.policy_head.in_features} → 2) → [Softmax]")
-        if self.use_sigmoid_value:
-            print(f"  Value:  Linear({self.value_head[0].in_features} → 1) → Sigmoid")
-        else:
-            print(f"  Value:  Linear({self.value_head.in_features} → 1) (raw)")
+        print(f"  Value:  Linear({self.value_head[0].in_features} → 1) → Sigmoid")
         print()
         
         # Initialization strategy with mathematical rationale
@@ -274,11 +267,8 @@ class CartPoleModel(nn.Module):
         print("    MCTS benefit: Near Max Entropy prior enables fair exploration")
         print()
         print("  VALUE HEAD → Xavier Uniform (gain=1.0)")
-        if self.use_sigmoid_value:
-            print("    Rationale: Sigmoid saturates outside [-3, 3]")
-            print("    Xavier keeps std(z) ≈ 1 → 99.7% in linear regime")
-        else:
-            print("    Rationale: Unbounded output for faster gradient flow")
+        print("    Rationale: Sigmoid saturates outside [-3, 3]")
+        print("    Xavier keeps std(z) ≈ 1 → 99.7% in linear regime")
         print("=" * 70 + "\n")
 
 
@@ -307,12 +297,19 @@ class CartPolePolicyValueNet(TorchPolicyValueNet):
         "policy_weight": 1.0,
     }
 
-    def __init__(self, random_seed=None, n_hidden_layers=2, hidden_size=128, use_sigmoid_value=True, training_params={}, device=None):
+    def __init__(self, random_seed=None, n_hidden_layers=2, hidden_size=128, training_params={}, device=None):
         if random_seed is not None:
             torch.manual_seed(random_seed)
-            torch.use_deterministic_algorithms(True, warn_only=True)
+            # NOTE: torch.use_deterministic_algorithms(True) is intentionally
+            # DISABLED on MPS — the deterministic backward/optimizer code paths
+            # on Apple's Metal backend produce NaN in value head weights after
+            # a few gradient steps. Reproducibility on MPS is best achieved via
+            # manual_seed alone.
+            effective_device = device if device is not None else get_accelerator()
+            if effective_device != "mps":
+                torch.use_deterministic_algorithms(True, warn_only=True)
 
-        model = CartPoleModel(n_hidden_layers=n_hidden_layers, hidden_size=hidden_size, use_sigmoid_value=use_sigmoid_value)
+        model = CartPoleModel(n_hidden_layers=n_hidden_layers, hidden_size=hidden_size)
         super().__init__(model)
         self.training_params = self.default_training_params | training_params
         
@@ -502,9 +499,6 @@ def parse_args():
                         help="Run in interactive mode to configure hyperparameters")
     parser.add_argument("--test", action="store_true",
                         help="Run verification tests instead of training")
-    parser.add_argument("--ablation", action="store_true",
-                        help="Run Sigmoid ablation experiment (with vs without)")
-    
     return parser.parse_args()
 
 
@@ -1002,12 +996,12 @@ def run_training(config):
         game = CartPoleGame(max_steps=config["max_steps"])
         net = CartPolePolicyValueNet(
             random_seed=config["random_seed"],
-            use_sigmoid_value=config.get("use_sigmoid_value", True),  # Default to True for backward compat
             training_params={
                 "epochs": config["epochs"],
                 "learning_rate": config["lr"],
                 "policy_weight": config["policy_weight"],
-            }
+            },
+            device=config.get("device"),
         )
         
         # Print neural network architecture
@@ -1060,76 +1054,6 @@ def run_training(config):
         sys.stderr = original_stderr
         log_file.close()
 
-
-def run_ablation_experiment(config):
-    """
-    Run Sigmoid ablation experiment: compare WITH vs WITHOUT Sigmoid value head.
-    
-    This function:
-    1. Runs training WITH Sigmoid value head
-    2. Runs training WITHOUT Sigmoid value head  
-    3. Generates comparison plots showing the difference
-    
-    The comparison plot is saved to runs/ablation_comparison_<timestamp>.png
-    """
-    from datetime import datetime
-    
-    print("=" * 70)
-    print("SIGMOID ABLATION EXPERIMENT")
-    print("=" * 70)
-    print("This experiment compares two value head configurations:")
-    print("  1. WITH Sigmoid    → output ∈ [0, 1] (bounded)")
-    print("  2. WITHOUT Sigmoid → output ∈ (-∞, +∞) (unbounded)")
-    print("=" * 70)
-    
-    # Store original config
-    base_config = config.copy()
-    
-    # --- Run 1: WITH Sigmoid ---
-    print("\n" + "=" * 60)
-    print("[Ablation] Run 1/2: WITH Sigmoid value head")
-    print("=" * 60)
-    config1 = base_config.copy()
-    config1["use_sigmoid_value"] = True
-    history_sigmoid, run_dir_sigmoid = run_training(config1)
-    
-    # --- Run 2: WITHOUT Sigmoid ---
-    print("\n" + "=" * 60)
-    print("[Ablation] Run 2/2: WITHOUT Sigmoid value head")
-    print("=" * 60)
-    config2 = base_config.copy()
-    config2["use_sigmoid_value"] = False
-    history_nosigmoid, run_dir_nosigmoid = run_training(config2)
-    
-    # --- Generate Comparison Plot ---
-    print("\n" + "=" * 60)
-    print("[Ablation] Generating comparison plot...")
-    print("=" * 60)
-    
-    # Save to runs directory with timestamp
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    comparison_path = Path(__file__).parent / "runs" / f"ablation_comparison_{timestamp}.png"
-    comparison_path.parent.mkdir(parents=True, exist_ok=True)
-    
-    plot_comparison(history_sigmoid, history_nosigmoid, save_path=comparison_path)
-    
-    # Print summary
-    print("\n" + "=" * 70)
-    print("ABLATION EXPERIMENT COMPLETE")
-    print("=" * 70)
-    print(f"\nResults Summary:")
-    print(f"  WITH Sigmoid:")
-    print(f"    - Final reward: {history_sigmoid['reward_mean'][-1]:.4f}")
-    print(f"    - Final value loss: {history_sigmoid['loss_value'][-1]:.6f}")
-    print(f"    - Output dir: {run_dir_sigmoid}")
-    print(f"\n  WITHOUT Sigmoid:")
-    print(f"    - Final reward: {history_nosigmoid['reward_mean'][-1]:.4f}")
-    print(f"    - Final value loss: {history_nosigmoid['loss_value'][-1]:.6f}")
-    print(f"    - Output dir: {run_dir_nosigmoid}")
-    print(f"\n  Comparison plot: {comparison_path}")
-    print("=" * 70)
-    
-    return history_sigmoid, history_nosigmoid, comparison_path
 
 
 def run_phase4_verification():
@@ -1188,6 +1112,7 @@ def run_phase4_verification():
         "policy_weight": 2.0,
         "threshold": 0.55,
         "use_gating": False,  # Disable gating for speed
+        "device": "cpu",      # MPS has numerical issues with tiny batches
         "random_seed": 42,
     }
     
@@ -1226,15 +1151,10 @@ if __name__ == "__main__":
         run_verification_tests()  # Phases 1, 2, 3
         print("\n")
         run_phase4_verification()  # Phase 4
-        
+
         print("\n" + "=" * 60)
         print("ALL VERIFICATION TESTS PASSED (Phases 1, 2, 3, 4)")
         print("=" * 60)
-    elif args.ablation:
-        # Run Sigmoid ablation experiment
-        config = build_config_from_args(args)
-        print_config(config)
-        run_ablation_experiment(config)
     else:
         # Build config from args
         config = build_config_from_args(args)

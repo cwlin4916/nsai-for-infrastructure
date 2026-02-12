@@ -668,13 +668,23 @@ if __name__ == "__main__":
 
     # 5. Execution Loop (Unrolled)
     n_iters = config["n_iters"]
+    # Compute correct theoretical max for plotting
+    # Dense mode: best cumulative reward = (nsites - nones) * (1/nsites) = (nsites - nones) / nsites
+    # Sparse mode: best terminal reward = 1.0 (all bits filled)
+    nones = mygame.env.nones  # number of initially-set bits
+    if config["sparsemode"]:
+        theoretical_max = 1.0
+    else:
+        theoretical_max = (nsites - nones) / nsites
+    print(f"Theoretical max reward: {theoretical_max:.4f} ({'sparse' if config['sparsemode'] else 'dense'} mode, nsites={nsites}, nones={nones})")
+
     try:
         for i in range(n_iters):
             print(f"\n=== Iteration {i+1}/{n_iters} ===")
             myagent.play_and_train()
             
             # Save Plot
-            plot_training_metrics(myagent.history, save_path=str(run_dir / "metrics_latest.png"))
+            plot_training_metrics(myagent.history, save_path=str(run_dir / "metrics_latest.png"), theoretical_max=theoretical_max)
             
     except KeyboardInterrupt:
         print("\n\nTraining interrupted by user. Exiting safely...")
