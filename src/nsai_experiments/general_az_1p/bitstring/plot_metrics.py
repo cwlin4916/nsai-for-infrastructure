@@ -16,6 +16,7 @@ def plot_training_metrics(history, save_path=None, theoretical_max=1.0):
         history (dict): Dictionary containing lists of metrics:
             - 'iteration'
             - 'reward_mean', 'reward_std'
+            - 'bare_net_reward_mean', 'bare_net_reward_std' (optional)
             - 'loss_policy', 'loss_value'
             - 'game_length'
         save_path (str, optional): Path to save the figure. If None, shows the plot.
@@ -33,9 +34,17 @@ def plot_training_metrics(history, save_path=None, theoretical_max=1.0):
     reward_mean = np.array(history['reward_mean'])
     reward_std = np.array(history['reward_std'])
     
-    ax1.plot(iterations, reward_mean, label='Mean Reward', color='b', marker='o')
-    ax1.fill_between(iterations, reward_mean - reward_std, reward_mean + reward_std, color='b', alpha=0.2, label='Std Dev')
-    
+    ax1.plot(iterations, reward_mean, label='MCTS Reward', color='b', marker='o')
+    ax1.fill_between(iterations, reward_mean - reward_std, reward_mean + reward_std, color='b', alpha=0.2)
+
+    # Bare network reward (no MCTS)
+    bare_means = history.get('bare_net_reward_mean', [])
+    if bare_means and any(v is not None for v in bare_means):
+        bare_mean = np.array([v if v is not None else np.nan for v in bare_means])
+        bare_std = np.array([v if v is not None else np.nan for v in history.get('bare_net_reward_std', [])])
+        ax1.plot(iterations, bare_mean, label='Bare Net Reward', color='orange', marker='o', linestyle='--')
+        ax1.fill_between(iterations, bare_mean - bare_std, bare_mean + bare_std, color='orange', alpha=0.2)
+
     # Theoretical Max Line
     ax1.axhline(y=theoretical_max, color='r', linestyle='--', label=f'Theoretical Max ({theoretical_max:.2f})')
     
@@ -98,6 +107,8 @@ if __name__ == "__main__":
         'iteration': [1, 2, 3, 4, 5],
         'reward_mean': [0.1, 0.3, 0.6, 0.8, 0.95],
         'reward_std': [0.05, 0.1, 0.15, 0.1, 0.02],
+        'bare_net_reward_mean': [0.05, 0.15, 0.35, 0.55, 0.7],
+        'bare_net_reward_std': [0.04, 0.08, 0.12, 0.08, 0.03],
         'loss_policy': [2.5, 2.0, 1.5, 1.0, 0.8],
         'loss_value': [0.5, 0.3, 0.1, 0.01, 0.001],
         'game_length': [20, 15, 12, 10, 8]

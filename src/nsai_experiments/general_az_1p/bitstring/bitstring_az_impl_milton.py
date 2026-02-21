@@ -101,7 +101,8 @@ class BitStringGameGym(gym.Env):
         if seed is not None:
             np.random.seed(seed)
             torch.manual_seed(seed)
-            torch.use_deterministic_algorithms(True, warn_only=True)
+            if not torch.backends.mps.is_available():
+                torch.use_deterministic_algorithms(True, warn_only=True)
         ones = np.random.choice(range(self.nsites), self.nones, replace=False)
         self.state = np.zeros(self.nsites, dtype=np.float32)
         self.state[ones] = 1
@@ -157,7 +158,13 @@ class BitStringPolicyValueNet(TorchPolicyValueNet):
     def __init__(self, random_seed = None, nsites = 10, n_hidden_layers = 2, hidden_size = 128, training_params = {}, device = None):
         if random_seed is not None:
             torch.manual_seed(random_seed)
-            torch.use_deterministic_algorithms(True, warn_only=True)
+            # NOTE: torch.use_deterministic_algorithms(True) is intentionally
+            # DISABLED on MPS — the deterministic backward/optimizer code paths
+            # on Apple's Metal backend produce NaN in value head weights after
+            # a few gradient steps (see commit 97aa006 for CartPole fix).
+            effective_device = device if device is not None else get_accelerator()
+            if effective_device != "mps":
+                torch.use_deterministic_algorithms(True, warn_only=True)
 
         model = BitStringModel(nsites, n_hidden_layers=n_hidden_layers, hidden_size=hidden_size)
         self.nsites = nsites
@@ -218,6 +225,7 @@ class BitStringPolicyValueNet(TorchPolicyValueNet):
                 loss = loss_value + policy_weight*loss_policy
 
                 loss.backward()
+                torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
                 optimizer.step()
                 loss = loss.item()
                 train_mini_losses.append(loss)
@@ -332,6 +340,8 @@ class TrackingAgent(Agent):
             'iteration': [],
             'reward_mean': [],
             'reward_std': [],
+            'bare_net_reward_mean': [],
+            'bare_net_reward_std': [],
             'loss_policy': [],
             'loss_value': [],
             'game_length': []
@@ -421,19 +431,29 @@ class TrackingAgent(Agent):
         print(f"Old network+MCTS average reward: {old_rewards.mean():.4f}, min: {old_rewards.min():.4f}, max: {old_rewards.max():.4f}, stdev: {old_rewards.std():.4f}")
         print(f"New network+MCTS average reward: {new_rewards.mean():.4f}, min: {new_rewards.min():.4f}, max: {new_rewards.max():.4f}, stdev: {new_rewards.std():.4f}")
 
+        if PIT_NO_MCTS:
+            old_rewards_no_mcts = eval_results_arrays["old_net_no_mcts"]
+            new_rewards_no_mcts = eval_results_arrays["new_net_no_mcts"]
+            print(f"Old bare network average reward: {old_rewards_no_mcts.mean():.4f}, min: {old_rewards_no_mcts.min():.4f}, max: {old_rewards_no_mcts.max():.4f}, stdev: {old_rewards_no_mcts.std():.4f}")
+            print(f"New bare network average reward: {new_rewards_no_mcts.mean():.4f}, min: {new_rewards_no_mcts.min():.4f}, max: {new_rewards_no_mcts.max():.4f}, stdev: {new_rewards_no_mcts.std():.4f}")
+
         wins = np.sum((new_rewards > old_rewards) & ~(np.isclose(new_rewards, old_rewards)))
         ties = np.sum(np.isclose(new_rewards, old_rewards))
         losses = np.sum((new_rewards < old_rewards) & ~(np.isclose(new_rewards, old_rewards)))
         score = (wins + ties / 2) / self.n_games_per_eval
         print(f"New network won {wins} and tied {ties} out of {self.n_games_per_eval} games ({score:.2%} wins where ties are half wins)")
-        
-        return {
+
+        result = {
             'score': score,
             'new_reward_mean': new_rewards.mean(),
             'new_reward_std': new_rewards.std(),
             'old_reward_mean': old_rewards.mean(),
             'old_reward_std': old_rewards.std()
         }
+        if PIT_NO_MCTS:
+            result['bare_new_reward_mean'] = new_rewards_no_mcts.mean()
+            result['bare_new_reward_std'] = new_rewards_no_mcts.std()
+        return result
 
     def play_and_train(self):
         import itertools
@@ -468,7 +488,7 @@ class TrackingAgent(Agent):
         # Evaluate
         eval_stats = self.pit(self_before_training)
         score = eval_stats['score']
-        
+
         if score >= self.threshold_to_keep:
             print("Keeping the new network")
         else:
@@ -483,6 +503,8 @@ class TrackingAgent(Agent):
         self.history['iteration'].append(iter_idx)
         self.history['reward_mean'].append(eval_stats['new_reward_mean'])
         self.history['reward_std'].append(eval_stats['new_reward_std'])
+        self.history['bare_net_reward_mean'].append(eval_stats.get('bare_new_reward_mean', None))
+        self.history['bare_net_reward_std'].append(eval_stats.get('bare_new_reward_std', None))
         self.history['loss_policy'].append(loss_policy)
         self.history['loss_value'].append(loss_value)
         self.history['game_length'].append(avg_game_len)
@@ -500,19 +522,20 @@ if __name__ == "__main__":
     # Default Configuration
     # Default Configuration (User Specific)
     config = {
-        "nsites": 6,              # [CHANGED] 10 -> 6
-        "sparsemode": False,      # [CHANGED] True -> False (Dense)
-        "n_iters": 40,            # [CHANGED] 100 -> 40
+        "nsites": 10,             # Sweep-validated default for sparse mode
+        "sparsemode": True,       # Sparse reward (sweep_20260221_121610)
+        "n_iters": 40,
         "n_games_per_train": 100,
         "n_games_per_eval": 30,
-        "mcts_sims": 30,          # [CHANGED] 50 -> 30
+        "mcts_sims": 120,         # Sparse needs many more sims (best at 120)
         "c_expl": 1.5,
         "epochs": 10,
         "lr": 1e-3,
         "threshold": 0.55,
-        "use_gating": True,       # [ADDED] Default: Gating enabled
-        "dirichlet_alpha": 0.3,   # [ADDED] Default: Alpha=0.3
-        "dirichlet_epsilon": 0.25 # [ADDED] Default: Epsilon=0.25
+        "use_gating": True,       # Default: Gating enabled
+        "dirichlet_alpha": 0.3,   # Default: Alpha=0.3
+        "dirichlet_epsilon": 0.25, # Default: Epsilon=0.25
+        "policy_weight": 1.0,      # pw=1.0 + 120 sims was best combo in sweep
     }
 
     # 1. Parse CLI Arguments
@@ -533,6 +556,7 @@ if __name__ == "__main__":
     parser.add_argument("--lr", type=float, help="Learning Rate")
     parser.add_argument("--threshold", type=float, help="Evaluation win rate threshold")
     parser.add_argument("--eval_games", type=int, help="Games per evaluation round")
+    parser.add_argument("--policy_weight", type=float, help="Policy loss weight relative to value loss (default: 2.0)")
 
     args = parser.parse_args()
 
@@ -551,6 +575,7 @@ if __name__ == "__main__":
     if args.nogating: config["use_gating"] = False
     if args.dirichlet_alpha: config["dirichlet_alpha"] = args.dirichlet_alpha
     if args.dirichlet_epsilon: config["dirichlet_epsilon"] = args.dirichlet_epsilon
+    if args.policy_weight is not None: config["policy_weight"] = args.policy_weight
 
     # 3. Interactive Mode
     if args.interactive:
@@ -581,17 +606,17 @@ if __name__ == "__main__":
             val = input(f"Learning Rate [default: {config['lr']}]: ").strip()
             if val: config["lr"] = float(val)
             
+            # Gating Selection (ask before threshold/eval games since they depend on it)
+            current_gating = "yes" if config["use_gating"] else "no"
+            val = input(f"Enable Gating (pit new vs old)? (yes/no) [default: {current_gating}]: ").strip().lower()
+            if val in ["no", "n", "false"]: config["use_gating"] = False
+            elif val in ["yes", "y", "true"]: config["use_gating"] = True
+
             val = input(f"Eval Threshold [default: {config['threshold']}]: ").strip()
             if val: config["threshold"] = float(val)
 
             val = input(f"Eval Games [default: {config['n_games_per_eval']}]: ").strip()
             if val: config["n_games_per_eval"] = int(val)
-            
-            # Gating Selection
-            current_gating = "yes" if config["use_gating"] else "no"
-            val = input(f"Enable Gating (pit new vs old)? (yes/no) [default: {current_gating}]: ").strip().lower()
-            if val in ["no", "n", "false"]: config["use_gating"] = False
-            elif val in ["yes", "y", "true"]: config["use_gating"] = True
             
             # Dirichlet Noise
             val = input(f"Dirichlet Alpha [default: {config['dirichlet_alpha']}]: ").strip()
@@ -599,6 +624,9 @@ if __name__ == "__main__":
             
             val = input(f"Dirichlet Epsilon [default: {config['dirichlet_epsilon']}]: ").strip()
             if val: config["dirichlet_epsilon"] = float(val)
+
+            val = input(f"Policy Loss Weight [default: {config['policy_weight']}]: ").strip()
+            if val: config["policy_weight"] = float(val)
 
         except ValueError as e:
             print(f"Invalid input, using defaults. Error: {e}")
@@ -645,7 +673,7 @@ if __name__ == "__main__":
         training_params={
             "epochs": config["epochs"], 
             "learning_rate": config["lr"], 
-            "policy_weight": 2.0
+            "policy_weight": config["policy_weight"]
         }
     )
     # USE TrackingAgent instead of Agent

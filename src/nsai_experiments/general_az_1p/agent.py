@@ -88,6 +88,8 @@ class Agent():
             'iteration': [],
             'reward_mean': [],
             'reward_std': [],
+            'bare_net_reward_mean': [],
+            'bare_net_reward_std': [],
             'loss_policy': [],
             'loss_value': [],
             'game_length': []
@@ -307,6 +309,8 @@ class Agent():
         self.history['iteration'].append(iter_idx)
         self.history['reward_mean'].append(eval_stats['new_reward_mean'])
         self.history['reward_std'].append(eval_stats['new_reward_std'])
+        self.history['bare_net_reward_mean'].append(eval_stats.get('bare_new_reward_mean', None))
+        self.history['bare_net_reward_std'].append(eval_stats.get('bare_new_reward_std', None))
         self.history['loss_policy'].append(loss_policy)
         self.history['loss_value'].append(loss_value)
         self.history['game_length'].append(avg_game_len)
@@ -356,13 +360,17 @@ class Agent():
         score = (wins + ties / 2) / self.n_games_per_eval  # a tie is half a win
         print(f"New network won {wins} and tied {ties} out of {self.n_games_per_eval} games ({score:.2%} wins where ties are half wins)")
         
-        return {
+        result = {
             'score': score,
             'new_reward_mean': new_rewards.mean(),
             'new_reward_std': new_rewards.std(),
             'old_reward_mean': old_rewards.mean(),
             'old_reward_std': old_rewards.std()
         }
+        if PIT_NO_MCTS:
+            result['bare_new_reward_mean'] = new_rewards_no_mcts.mean()
+            result['bare_new_reward_std'] = new_rewards_no_mcts.std()
+        return result
     
     def play_train_multiple(self, n_trains: int, start_at = 0, checkpoint_every = None, checkpoint_dir = "general_az_1p_checkpoint"):
         for i in range(start_at, n_trains):
